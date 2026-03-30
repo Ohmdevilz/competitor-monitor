@@ -18,6 +18,24 @@
   --radius: 12px;
 }
 
+/* ─── Light Mode ────────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef0f6;
+  --border: #d1d5e0;
+  --text: #1a1d2e;
+  --text-dim: #6b7080;
+  --accent: #4f46e5;
+  --accent-glow: rgba(79,70,229,0.12);
+  --alert: #dc2626;
+  --alert-bg: rgba(220,38,38,0.08);
+  --alert-border: rgba(220,38,38,0.35);
+  --success: #16a34a;
+}
+[data-theme="light"] .card-content { color: #374151; }
+[data-theme="light"] .company-card:hover { border-color: #a0a8c0; }
+
 html { font-size: 15px; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
 
@@ -46,6 +64,21 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
 }
 
 .app-subtitle { font-size: 0.85rem; color: var(--text-dim); }
+
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+.btn-theme-toggle {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font: 600 0.875rem var(--sans);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-theme-toggle:hover { color: var(--text); border-color: var(--accent); }
 
 .btn-run {
   background: var(--accent);

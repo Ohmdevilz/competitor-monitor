@@ -16,6 +16,15 @@ export default function App() {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [runStatus, setRunStatus] = useState("");
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const stored = localStorage.getItem("darkMode");
+    return stored !== null ? stored === "true" : true;
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    localStorage.setItem("darkMode", String(darkMode));
+  }, [darkMode]);
 
   // Load available dates on mount
   useEffect(() => {
@@ -90,6 +99,9 @@ export default function App() {
           <span className="app-subtitle">ติดตามคู่แข่งตลาดโลจิสติกส์ไทย</span>
         </div>
         <div className="header-right">
+          <button className="btn-theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}>
+            {darkMode ? "☀ Light" : "☾ Dark"}
+          </button>
           <button className="btn-run" onClick={handleRunNow} disabled={!!runStatus}>
             {runStatus || "▶ รันตอนนี้"}
           </button>
