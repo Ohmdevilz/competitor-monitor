@@ -37,7 +37,7 @@ def get_summary(company_id: str) -> dict | None:
         .table("competitor_summary")
         .select("*")
         .eq("company_id", company_id)
-        .single()
+        .maybe_single()
         .execute()
     )
     return resp.data
