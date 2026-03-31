@@ -29,14 +29,15 @@ def _make_job(slot: str):
 def create_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone=TZ_BANGKOK)
 
-    for hour, slot in [(9, "09:00"), (12, "12:00"), (15, "15:00"), (18, "18:00")]:
-        scheduler.add_job(
-            _make_job(slot),
-            CronTrigger(hour=hour, minute=0, timezone=TZ_BANGKOK),
-            id=f"monitor_{slot.replace(':', '')}",
-            name=f"Competitor Monitor {slot}",
-            max_instances=1,
-            coalesce=True,
-        )
+    # Cron jobs temporarily disabled — uncomment to re-enable
+    # for hour, slot in [(9, "09:00"), (12, "12:00"), (15, "15:00"), (18, "18:00")]:
+    #     scheduler.add_job(
+    #         _make_job(slot),
+    #         CronTrigger(hour=hour, minute=0, timezone=TZ_BANGKOK),
+    #         id=f"monitor_{slot.replace(':', '')}",
+    #         name=f"Competitor Monitor {slot}",
+    #         max_instances=1,
+    #         coalesce=True,
+    #     )
 
     return scheduler
