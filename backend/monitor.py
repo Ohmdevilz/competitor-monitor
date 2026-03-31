@@ -144,8 +144,12 @@ def run_monitor_cycle(api_key: str, time_slot: str | None = None) -> dict:
         try:
             # Get last cumulative summary
             last = db.get_summary(company["id"])
+            logger.info("  [monitor] get_summary(%s) → type=%s | repr=%s",
+                        company["id"], type(last).__name__, repr(last)[:300])
             old_summary = last["summary"] if last else None
             old_updated = last["updated_at"] if last else None
+            logger.info("  [monitor] old_summary exists=%s | old_updated=%s",
+                        bool(old_summary), old_updated)
 
             # Search + build updated profile (single Perplexity call)
             result = _search_and_update(company, old_summary, old_updated, api_key)

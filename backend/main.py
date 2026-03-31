@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.getLogger("database").setLevel(logging.DEBUG)
+logging.getLogger("monitor").setLevel(logging.DEBUG)
 
 import database as db
 from monitor import COMPANIES, run_monitor_cycle

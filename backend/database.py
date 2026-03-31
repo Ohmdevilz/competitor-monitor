@@ -1,8 +1,11 @@
 import os
+import logging
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 _client: Client | None = None
 
@@ -40,6 +43,13 @@ def get_summary(company_id: str) -> dict | None:
         .maybe_single()
         .execute()
     )
+    logger.info("[get_summary] company_id=%s | resp type=%s | repr=%s",
+                company_id, type(resp).__name__, repr(resp)[:300])
+    if not hasattr(resp, "data"):
+        logger.error("[get_summary] resp has NO .data attribute — returning None")
+        return None
+    logger.info("[get_summary] resp.data type=%s | repr=%s",
+                type(resp.data).__name__, repr(resp.data)[:300])
     return resp.data
 
 
