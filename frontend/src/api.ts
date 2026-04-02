@@ -1,25 +1,34 @@
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
-export interface CompanyData {
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface DailySnapshot {
+  id: string;
   company_id: string;
   company_name: string;
-  summary?: string;   // from competitor_summary
-  content?: string;   // from competitor_snapshots
-  has_alert: boolean;
-  updated_at?: string;
-  snapshot_date?: string;
-  snapshot_time_slot?: string;
+  snapshot_date: string;
+  raw_news: string;
+  sentiment_score: number | null;
+  sentiment_label: string | null;
+  summary: string | null;
+  top_themes: string[];
+  action_items: string | null;
+  risk_flag: boolean;
+  created_at: string;
 }
 
-export async function fetchSummaries(): Promise<CompanyData[]> {
-  const res = await fetch(`${BASE}/summaries`);
-  if (!res.ok) throw new Error("Failed to fetch summaries");
-  return res.json();
+export interface ReportResult {
+  report_md: string;
+  date_from: string;
+  date_to: string;
+  id?: string;
 }
 
-export async function fetchSnapshots(date: string, slot: string): Promise<CompanyData[]> {
-  const res = await fetch(`${BASE}/snapshots?date=${date}&slot=${encodeURIComponent(slot)}`);
-  if (!res.ok) throw new Error("Failed to fetch snapshots");
+// ─── Daily Snapshots ────────────────────────────────────────────────────────
+
+export async function fetchDaily(date: string): Promise<DailySnapshot[]> {
+  const res = await fetch(`${BASE}/daily?date=${date}`);
+  if (!res.ok) throw new Error("Failed to fetch daily snapshots");
   return res.json();
 }
 
@@ -29,11 +38,18 @@ export async function fetchDates(): Promise<string[]> {
   return res.json();
 }
 
-export async function fetchSlots(date: string): Promise<string[]> {
-  const res = await fetch(`${BASE}/slots?date=${date}`);
-  if (!res.ok) return [];
+// ─── On-Demand Report ───────────────────────────────────────────────────────
+
+export async function generateReport(dateFrom: string, dateTo: string): Promise<ReportResult> {
+  const res = await fetch(
+    `${BASE}/report?date_from=${dateFrom}&date_to=${dateTo}`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error("Failed to generate report");
   return res.json();
 }
+
+// ─── Manual Run ─────────────────────────────────────────────────────────────
 
 export async function triggerRun(): Promise<void> {
   const res = await fetch(`${BASE}/run`, { method: "POST" });

@@ -1,20 +1,18 @@
 import { useEffect, useState, useCallback } from "react";
-import type { CompanyData } from "./api";
-import { fetchSummaries, fetchSnapshots, fetchDates, fetchSlots, triggerRun } from "./api";
+import type { DailySnapshot } from "./api";
+import { fetchDaily, fetchDates, triggerRun } from "./api";
 import CompanyCard from "./components/CompanyCard";
-import FilterBar from "./components/FilterBar";
+import ReportView from "./components/ReportView";
 
-type Mode = "latest" | "snapshot";
+type Tab = "daily" | "report";
 type Status = "idle" | "loading" | "error";
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>("latest");
-  const [data, setData] = useState<CompanyData[]>([]);
+  const [tab, setTab] = useState<Tab>("daily");
+  const [data, setData] = useState<DailySnapshot[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedSlot, setSelectedSlot] = useState("");
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [runStatus, setRunStatus] = useState("");
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const stored = localStorage.getItem("darkMode");
@@ -28,62 +26,42 @@ export default function App() {
 
   // Load available dates on mount
   useEffect(() => {
-    fetchDates().then(setAvailableDates).catch(console.error);
+    fetchDates().then((dates) => {
+      setAvailableDates(dates);
+      if (dates.length > 0 && !selectedDate) {
+        setSelectedDate(dates[0]);
+      }
+    }).catch(console.error);
   }, []);
 
-  const loadLatest = useCallback(async () => {
+  // Load daily snapshots when date changes
+  const loadDaily = useCallback(async (date: string) => {
+    if (!date) return;
     setStatus("loading");
     try {
-      const result = await fetchSummaries();
+      const result = await fetchDaily(date);
       setData(result);
-      setMode("latest");
       setStatus("idle");
     } catch {
       setStatus("error");
     }
   }, []);
 
-  // Load latest on mount
-  useEffect(() => { loadLatest(); }, [loadLatest]);
-
-  async function handleDateChange(date: string) {
-    setSelectedDate(date);
-    setSelectedSlot("");
-    setData([]);
-    if (!date) { loadLatest(); return; }
-    const slots = await fetchSlots(date);
-    setAvailableSlots(slots);
-  }
-
-  async function handleSlotChange(slot: string) {
-    setSelectedSlot(slot);
-    if (!slot || !selectedDate) return;
-    setStatus("loading");
-    try {
-      const result = await fetchSnapshots(selectedDate, slot);
-      setData(result);
-      setMode("snapshot");
-      setStatus("idle");
-    } catch {
-      setStatus("error");
-    }
-  }
-
-  function handleLatest() {
-    setSelectedDate("");
-    setSelectedSlot("");
-    setAvailableSlots([]);
-    loadLatest();
-  }
+  useEffect(() => {
+    if (selectedDate) loadDaily(selectedDate);
+  }, [selectedDate, loadDaily]);
 
   async function handleRunNow() {
     setRunStatus("กำลังรัน...");
     try {
       await triggerRun();
       setRunStatus("รันเสร็จแล้ว! กำลังโหลดข้อมูลใหม่...");
-      await loadLatest();
       const dates = await fetchDates();
       setAvailableDates(dates);
+      if (dates.length > 0) {
+        setSelectedDate(dates[0]);
+        await loadDaily(dates[0]);
+      }
       setRunStatus("");
     } catch {
       setRunStatus("เกิดข้อผิดพลาด");
@@ -96,7 +74,7 @@ export default function App() {
       <header className="app-header">
         <div className="header-left">
           <h1 className="app-title">Competitor Monitor</h1>
-          <span className="app-subtitle">ติดตามคู่แข่งตลาดโลจิสติกส์ไทย</span>
+          <span className="app-subtitle">ติดตามคู่แข่งตลาดโลจิสติกส์ไทย — TP Logistics</span>
         </div>
         <div className="header-right">
           <button className="btn-theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}>
@@ -108,38 +86,56 @@ export default function App() {
         </div>
       </header>
 
-      <div className="filter-section">
-        <FilterBar
-          mode={mode}
-          selectedDate={selectedDate}
-          selectedSlot={selectedSlot}
-          availableDates={availableDates}
-          availableSlots={availableSlots}
-          onLatest={handleLatest}
-          onDateChange={handleDateChange}
-          onSlotChange={handleSlotChange}
-        />
-        {mode === "snapshot" && selectedDate && selectedSlot && (
-          <span className="viewing-label">
-            ดู Snapshot: {selectedDate} เวลา {selectedSlot}
-          </span>
-        )}
-      </div>
+      {/* Tabs */}
+      <nav className="tab-bar">
+        <button className={`tab-btn${tab === "daily" ? " active" : ""}`} onClick={() => setTab("daily")}>
+          Daily Monitor
+        </button>
+        <button className={`tab-btn${tab === "report" ? " active" : ""}`} onClick={() => setTab("report")}>
+          On-Demand Report
+        </button>
+      </nav>
 
-      <main className="card-grid">
-        {status === "loading" && (
-          <div className="loading-state">กำลังโหลดข้อมูล...</div>
-        )}
-        {status === "error" && (
-          <div className="error-state">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>
-        )}
-        {status === "idle" && data.length === 0 && (
-          <div className="empty-state">ยังไม่มีข้อมูล — กด "รันตอนนี้" เพื่อเริ่มต้น</div>
-        )}
-        {status === "idle" && data.map((company) => (
-          <CompanyCard key={company.company_id} data={company} mode={mode} />
-        ))}
-      </main>
+      {/* Daily Monitor Tab */}
+      {tab === "daily" && (
+        <>
+          <div className="filter-section">
+            <select
+              className="filter-select"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            >
+              <option value="">— เลือกวันที่ —</option>
+              {availableDates.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            {selectedDate && (
+              <span className="viewing-label">
+                แสดงข้อมูลวันที่ {selectedDate}
+              </span>
+            )}
+          </div>
+
+          <main className="card-grid">
+            {status === "loading" && (
+              <div className="loading-state">กำลังโหลดข้อมูล...</div>
+            )}
+            {status === "error" && (
+              <div className="error-state">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>
+            )}
+            {status === "idle" && data.length === 0 && (
+              <div className="empty-state">ยังไม่มีข้อมูลสำหรับวันนี้ — กด "รันตอนนี้" เพื่อเริ่มต้น</div>
+            )}
+            {status === "idle" && data.map((snapshot) => (
+              <CompanyCard key={snapshot.id} data={snapshot} />
+            ))}
+          </main>
+        </>
+      )}
+
+      {/* Report Tab */}
+      {tab === "report" && <ReportView />}
     </div>
   );
 }

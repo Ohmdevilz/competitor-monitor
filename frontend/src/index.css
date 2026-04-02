@@ -14,6 +14,9 @@
   --alert-bg: rgba(239,68,68,0.08);
   --alert-border: rgba(239,68,68,0.35);
   --success: #22c55e;
+  --positive: #22c55e;
+  --negative: #ef4444;
+  --neutral: #8b90a8;
   --sans: "Inter", "Sarabun", system-ui, sans-serif;
   --radius: 12px;
 }
@@ -32,6 +35,9 @@
   --alert-bg: rgba(220,38,38,0.08);
   --alert-border: rgba(220,38,38,0.35);
   --success: #16a34a;
+  --positive: #16a34a;
+  --negative: #dc2626;
+  --neutral: #6b7080;
 }
 [data-theme="light"] .card-content { color: #374151; }
 [data-theme="light"] .company-card:hover { border-color: #a0a8c0; }
@@ -49,7 +55,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   justify-content: space-between;
   padding: 24px 0 20px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: 0;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -94,39 +100,37 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
 .btn-run:hover:not(:disabled) { opacity: 0.85; }
 .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ─── Filter Bar ────────────────────────────────────────────────────────────── */
+/* ─── Tabs ─────────────────────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  padding: 14px 24px;
+  font: 600 0.9rem var(--sans);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ─── Filter Section ───────────────────────────────────────────────────────── */
 .filter-section {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 24px;
   flex-wrap: wrap;
-}
-
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.btn-filter {
-  background: var(--surface);
-  color: var(--text-dim);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 16px;
-  font: 0.875rem var(--sans);
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.btn-filter:hover { color: var(--text); border-color: var(--accent); }
-.btn-filter.active {
-  background: var(--accent-glow);
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
 }
 
 .filter-select {
@@ -144,7 +148,6 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   transition: border-color 0.15s;
 }
 .filter-select:focus { outline: none; border-color: var(--accent); }
-.filter-select:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .viewing-label {
   font-size: 0.8rem;
@@ -155,14 +158,14 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   padding: 4px 10px;
 }
 
-/* ─── Card Grid ─────────────────────────────────────────────────────────────── */
+/* ─── Card Grid ────────────────────────────────────────────────────────────── */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 16px;
 }
 
-/* ─── Company Card ──────────────────────────────────────────────────────────── */
+/* ─── Company Card ─────────────────────────────────────────────────────────── */
 .company-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -194,6 +197,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   color: var(--text);
 }
 
+.card-badges { display: flex; align-items: center; gap: 6px; }
+
 .alert-badge {
   background: var(--alert-bg);
   border: 1px solid var(--alert-border);
@@ -205,9 +210,48 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   white-space: nowrap;
 }
 
+.sentiment-badge {
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sentiment--positive { background: rgba(34,197,94,0.12); color: var(--positive); border: 1px solid rgba(34,197,94,0.3); }
+.sentiment--negative { background: rgba(239,68,68,0.1); color: var(--negative); border: 1px solid rgba(239,68,68,0.3); }
+.sentiment--neutral  { background: var(--surface-2); color: var(--neutral); border: 1px solid var(--border); }
+
 .card-meta {
   font-size: 0.75rem;
   color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.card-themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.theme-tag {
+  background: var(--accent-glow);
+  color: var(--accent);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
 }
 
 .card-content {
@@ -221,9 +265,94 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   scrollbar-color: var(--border) transparent;
 }
 
+.card-action {
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  line-height: 1.5;
+}
+
 .no-data { color: var(--text-dim); font-style: italic; }
 
-/* ─── States ────────────────────────────────────────────────────────────────── */
+/* ─── Report View ──────────────────────────────────────────────────────────── */
+.report-view { padding: 0; }
+
+.report-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.date-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.date-input {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: 0.875rem var(--sans);
+  transition: border-color 0.15s;
+}
+.date-input:focus { outline: none; border-color: var(--accent); }
+
+.btn-generate {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 24px;
+  font: 600 0.875rem var(--sans);
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.btn-generate:hover:not(:disabled) { opacity: 0.85; }
+.btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-export {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 20px;
+  font: 600 0.875rem var(--sans);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-export:hover { border-color: var(--accent); color: var(--accent); }
+
+.report-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  line-height: 1.8;
+  font-size: 0.9rem;
+}
+
+.report-content h1 { font-size: 1.5rem; margin-bottom: 16px; color: var(--text); }
+.report-content h2 { font-size: 1.2rem; margin-top: 24px; margin-bottom: 12px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.report-content h3 { font-size: 1.05rem; margin-top: 16px; margin-bottom: 8px; color: var(--text); }
+.report-content p { margin-bottom: 10px; }
+.report-content ul, .report-content ol { padding-left: 20px; margin-bottom: 10px; }
+.report-content li { margin-bottom: 4px; }
+.report-content strong { color: var(--text); }
+
+/* ─── States ───────────────────────────────────────────────────────────────── */
 .loading-state, .error-state, .empty-state {
   grid-column: 1 / -1;
   text-align: center;
@@ -233,8 +362,24 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
 }
 .error-state { color: var(--alert); }
 
-/* ─── Responsive ────────────────────────────────────────────────────────────── */
+/* ─── Print / PDF Export ───────────────────────────────────────────────────── */
+@media print {
+  body { background: #fff; color: #000; }
+  .app-header, .tab-bar, .filter-section, .report-controls, .btn-run, .btn-theme-toggle { display: none !important; }
+  .report-content {
+    border: none;
+    padding: 0;
+    background: #fff;
+    color: #000;
+    font-size: 11pt;
+  }
+  .report-content h1, .report-content h2, .report-content h3, .report-content strong { color: #000; }
+  .report-content h2 { border-bottom-color: #ccc; }
+}
+
+/* ─── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .card-grid { grid-template-columns: 1fr; }
   .app-header { flex-direction: column; align-items: flex-start; }
+  .report-content { padding: 16px; }
 }

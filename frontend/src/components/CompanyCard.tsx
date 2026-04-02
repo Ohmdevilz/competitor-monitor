@@ -1,40 +1,60 @@
-import type { CompanyData } from "../api";
+import type { DailySnapshot } from "../api";
 
 interface Props {
-  data: CompanyData;
-  mode: "latest" | "snapshot";
+  data: DailySnapshot;
 }
 
-function formatDate(iso: string | undefined): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return d.toLocaleString("th-TH", {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
-    timeZone: "Asia/Bangkok",
-  });
+function sentimentColor(label: string | null): string {
+  if (label === "positive") return "sentiment--positive";
+  if (label === "negative") return "sentiment--negative";
+  return "sentiment--neutral";
 }
 
-export default function CompanyCard({ data, mode }: Props) {
-  const content = mode === "latest" ? (data.summary ?? "") : (data.content ?? "");
-  const updatedAt = mode === "latest" ? data.updated_at : data.snapshot_date
-    ? `${data.snapshot_date} ${data.snapshot_time_slot}`
-    : undefined;
+function formatScore(score: number | null): string {
+  if (score === null) return "N/A";
+  const sign = score > 0 ? "+" : "";
+  return `${sign}${score.toFixed(1)}`;
+}
 
+export default function CompanyCard({ data }: Props) {
   return (
-    <div className={`company-card${data.has_alert ? " company-card--alert" : ""}`}>
+    <div className={`company-card${data.risk_flag ? " company-card--alert" : ""}`}>
       <div className="card-header">
         <span className="company-name">{data.company_name}</span>
-        {data.has_alert && <span className="alert-badge">⚠ ประกาศใหม่</span>}
+        <div className="card-badges">
+          {data.risk_flag && <span className="alert-badge">⚠ Risk</span>}
+          <span className={`sentiment-badge ${sentimentColor(data.sentiment_label)}`}>
+            {formatScore(data.sentiment_score)}
+          </span>
+        </div>
       </div>
 
       <div className="card-meta">
-        อัปเดต: {mode === "latest" ? formatDate(data.updated_at) : updatedAt ?? "-"}
+        {data.snapshot_date}
+        {data.sentiment_label && (
+          <span className={`label-tag ${sentimentColor(data.sentiment_label)}`}>
+            {data.sentiment_label}
+          </span>
+        )}
       </div>
 
+      {data.top_themes && data.top_themes.length > 0 && (
+        <div className="card-themes">
+          {data.top_themes.map((t) => (
+            <span key={t} className="theme-tag">{t}</span>
+          ))}
+        </div>
+      )}
+
       <div className="card-content">
-        {content || <span className="no-data">ยังไม่มีข้อมูล</span>}
+        {data.summary || data.raw_news || <span className="no-data">ยังไม่มีข้อมูล</span>}
       </div>
+
+      {data.action_items && (
+        <div className="card-action">
+          <strong>Action:</strong> {data.action_items}
+        </div>
+      )}
     </div>
   );
 }
