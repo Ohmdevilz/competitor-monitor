@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
@@ -12,7 +12,7 @@ logging.getLogger("database").setLevel(logging.DEBUG)
 logging.getLogger("monitor").setLevel(logging.DEBUG)
 
 import database as db
-from monitor import COMPANIES, run_monitor_cycle
+from monitor import COMPANIES, run_monitor_cycle, generate_report
 from scheduler import create_scheduler
 
 scheduler = create_scheduler()
@@ -36,40 +36,55 @@ app.add_middleware(
 )
 
 
-@app.get("/api/summaries")
-def get_summaries():
-    """ดึง Cumulative Summary ล่าสุดของทุกบริษัท"""
-    return db.get_all_summaries()
+# ─── V2 Endpoints ───────────────────────────────────────────────────────────
 
 
-@app.get("/api/snapshots")
-def get_snapshots(date: str, slot: str):
-    """ดึง Snapshot ตามวันที่และ time slot"""
-    return db.get_snapshots(date, slot)
+@app.get("/api/daily")
+def get_daily(date: str):
+    """ดึง Daily Snapshots ของวันที่ระบุ"""
+    return db.get_daily_snapshots(date)
 
 
 @app.get("/api/dates")
 def get_dates():
-    """ดึงรายการวันที่ที่มี snapshot"""
-    return db.get_available_dates()
+    """ดึงรายการวันที่ที่มี daily snapshot"""
+    return db.get_available_snapshot_dates()
 
 
-@app.get("/api/slots")
-def get_slots(date: str):
-    """ดึง time slots ที่มีข้อมูลของวันที่นั้น"""
-    return db.get_available_slots(date)
+@app.post("/api/report")
+def create_report(
+    date_from: str = Query(..., description="Start date YYYY-MM-DD"),
+    date_to: str = Query(..., description="End date YYYY-MM-DD"),
+):
+    """Generate on-demand report for a date range via Gemini"""
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+
+    report_md = generate_report(date_from, date_to, gemini_key)
+    saved = db.save_report(date_from, date_to, report_md)
+    return {"report_md": report_md, "date_from": date_from, "date_to": date_to, "id": saved.get("id")}
+
+
+@app.get("/api/reports")
+def get_reports():
+    """ดึงรายการ reports ที่เคย generate"""
+    return db.get_reports()
 
 
 @app.post("/api/run")
-def run_now(slot: str | None = None):
-    """Trigger monitor cycle manually"""
-    api_key = os.getenv("PERPLEXITY_API_KEY", "")
-    if not api_key:
+def run_now():
+    """Trigger daily monitor cycle manually"""
+    perplexity_key = os.getenv("PERPLEXITY_API_KEY", "")
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not perplexity_key:
         raise HTTPException(status_code=500, detail="PERPLEXITY_API_KEY not configured")
-    import asyncio
+    if not gemini_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor() as pool:
-        future = pool.submit(run_monitor_cycle, api_key, slot)
+        future = pool.submit(run_monitor_cycle, perplexity_key, gemini_key)
         result = future.result(timeout=600)
     return result
 
@@ -77,6 +92,15 @@ def run_now(slot: str | None = None):
 @app.get("/api/companies")
 def get_companies():
     return [{"id": c["id"], "name": c["name"]} for c in COMPANIES]
+
+
+# ─── Legacy Endpoints ───────────────────────────────────────────────────────
+
+
+@app.get("/api/summaries")
+def get_summaries():
+    """ดึง Cumulative Summary ล่าสุดของทุกบริษัท (legacy)"""
+    return db.get_all_summaries()
 
 
 @app.get("/health")
