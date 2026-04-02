@@ -1,12 +1,15 @@
 """
-monitor.py — Core monitoring logic
-Each cycle: for each company, get last summary → search new news via Perplexity
-→ build cumulative profile → save snapshot + upsert summary
+monitor.py — Core monitoring logic (V2)
+Daily flow: Perplexity (news 24h) → Gemini (sentiment + analysis) → Supabase
+On-demand: date range → Supabase snapshots → Gemini report
 """
+import json
 import logging
+import re
 import time
 from datetime import datetime
 
+import google.generativeai as genai
 import pytz
 import requests
 
@@ -17,7 +20,7 @@ logger = logging.getLogger(__name__)
 TZ_BANGKOK = pytz.timezone("Asia/Bangkok")
 
 PERPLEXITY_API_BASE = "https://api.perplexity.ai/chat/completions"
-MODEL = "sonar-pro"
+PERPLEXITY_MODEL = "sonar-pro"
 
 COMPANIES = [
     {"id": "thailand_post",  "name": "ไปรษณีย์ไทย",  "name_en": "Thailand Post"},
@@ -26,152 +29,229 @@ COMPANIES = [
     {"id": "jnt_express",    "name": "J&T Express",    "name_en": "J&T Express Thailand"},
     {"id": "best_express",   "name": "Best Express",   "name_en": "Best Express Thailand"},
     {"id": "nim_express",    "name": "Nim Express",    "name_en": "Nim Express Thailand"},
-]
-
-ALERT_KEYWORDS = [
-    "ปรับราคา", "ขึ้นราคา", "เพิ่มราคา", "ลดราคา", "งดรับ", "ยกเลิกบริการ",
-    "fuel surcharge", "ค่าน้ำมัน", "ประกาศด่วน", "price increase",
-    "rate adjustment", "suspension", "หยุดให้บริการ", "ปรับขึ้น", "ค่าธรรมเนียมใหม่",
+    {"id": "tp_logistics",   "name": "TP Logistics",   "name_en": "TP Logistics Thailand"},
 ]
 
 
-def _detect_alert(content: str) -> bool:
-    cl = content.lower()
-    return any(kw.lower() in cl for kw in ALERT_KEYWORDS)
+# ─── Perplexity: Search news last 24h ───────────────────────────────────────
 
 
-def _perplexity_query(prompt: str, api_key: str, system: str = "") -> str:
-    messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
+def _perplexity_search(company: dict, api_key: str) -> str:
+    """Search recent 24h news for a company via Perplexity."""
+    now_bkk = datetime.now(TZ_BANGKOK).strftime("%Y-%m-%d %H:%M")
+
+    system = (
+        "You are a Thai logistics market intelligence analyst. "
+        "Search for verified, factual news only from the last 24 hours. "
+        "If no recent news is found, say so clearly. Do not hallucinate."
+    )
+
+    prompt = f"""วันที่และเวลาปัจจุบัน: {now_bkk} (เวลาไทย)
+
+ค้นหาข่าวและข้อมูลใหม่เกี่ยวกับ {company['name']} ({company['name_en']}) ในช่วง 24 ชั่วโมงที่ผ่านมา
+
+หัวข้อที่ต้องค้นหา:
+1. การปรับราคาค่าขนส่ง หรือค่าบริการใหม่
+2. ค่าธรรมเนียมเพิ่มเติม (Fuel Surcharge, Remote Area Surcharge)
+3. การงดรับพัสดุ หรือจำกัดพื้นที่บริการ
+4. โปรโมชั่นหรือแคมเปญใหม่
+5. ข่าวสำคัญ (นโยบายใหม่, ปัญหาบริการ, การขยายธุรกิจ, ความร่วมมือ)
+6. ข่าวเชิงลบ (ร้องเรียน, ปัญหาคุณภาพ, ข้อพิพาท)
+
+ตอบเป็นภาษาไทย พร้อมระบุแหล่งที่มาและวันที่ของข่าวแต่ละชิ้น
+ถ้าไม่พบข่าวใหม่ใน 24 ชั่วโมง ให้ระบุว่า "ไม่พบข่าวใหม่ในช่วง 24 ชั่วโมงที่ผ่านมา"
+"""
+
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": prompt},
+    ]
 
     resp = requests.post(
         PERPLEXITY_API_BASE,
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": MODEL, "messages": messages, "temperature": 0.1},
+        json={"model": PERPLEXITY_MODEL, "messages": messages, "temperature": 0.1},
         timeout=60,
     )
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
 
 
-def _search_and_update(company: dict, old_summary: str | None, old_updated: str | None, api_key: str) -> dict:
-    """Single Perplexity call: search new news + produce updated cumulative profile."""
-    now_bkk = datetime.now(TZ_BANGKOK).strftime("%Y-%m-%d %H:%M")
+# ─── Gemini: Analyze single brand ───────────────────────────────────────────
 
-    if old_summary and old_updated:
-        context_block = (
-            f"ข้อมูลที่มีอยู่แล้ว (อัปเดตล่าสุดเมื่อ {old_updated}):\n{old_summary}\n\n"
-        )
-        since_clause = f"ตั้งแต่ {old_updated} จนถึงตอนนี้"
-    else:
-        context_block = ""
-        since_clause = "ในช่วง 3 เดือนที่ผ่านมา"
 
-    system = (
-        "You are a Thai logistics market intelligence analyst. "
-        "Search verified, factual news only. Do not hallucinate. "
-        "If you cannot find specific information, say so clearly."
-    )
+def _gemini_analyze_brand(company: dict, raw_news: str, gemini_model) -> dict:
+    """Use Gemini to analyze sentiment + summarize a single brand's news."""
 
-    prompt = f"""วันนี้คือ {now_bkk} (เวลาไทย)
+    prompt = f"""คุณเป็นนักวิเคราะห์ตลาดขนส่งไทย วิเคราะห์ข่าวต่อไปนี้ของ {company['name']}:
 
-บริษัท: {company['name']} ({company['name_en']})
-{context_block}
-ค้นหาข้อมูลและข่าวใหม่เกี่ยวกับ {company['name']} ({company['name_en']}) {since_clause}
+--- ข่าวดิบ ---
+{raw_news}
+--- จบข่าวดิบ ---
 
-หัวข้อที่ต้องค้นหา:
-1. การปรับราคาค่าขนส่ง หรือค่าบริการใหม่
-2. ค่าธรรมเนียมเพิ่มเติม เช่น Fuel Surcharge, Remote Area Surcharge
-3. การงดรับพัสดุ หรือจำกัดพื้นที่บริการ
-4. โปรโมชั่นหรือแคมเปญใหม่
-5. ข่าวสำคัญของบริษัท (เช่น นโยบายใหม่, ปัญหาบริการ, การขยายธุรกิจ)
-
-ตอบในรูปแบบนี้เท่านั้น:
-
-## ข่าวใหม่
-[สิ่งที่ค้นพบใหม่ พร้อมวันที่ ถ้าไม่พบข่าวใหม่ให้เขียน "ไม่พบข่าวใหม่ในช่วงนี้"]
-
-## ภาพรวมปัจจุบัน
-[สรุปภาพรวมของบริษัทที่รวมข้อมูลเก่าและใหม่เข้าด้วยกัน ครอบคลุม:
-- ราคามาตรฐาน/โครงสร้างราคา (ถ้าทราบ)
-- ค่าธรรมเนียมที่ใช้อยู่ปัจจุบัน
-- โปรโมชั่นที่ใช้งานอยู่
-- ข้อจำกัดหรือพื้นที่งดบริการ
-- ข่าวสำคัญล่าสุด
-- อัปเดตล่าสุด: {now_bkk}]
+ตอบในรูปแบบ JSON เท่านั้น (ไม่ต้องมี markdown code block):
+{{
+  "sentiment_score": <ตัวเลข -10.0 ถึง 10.0, บวก=เชิงบวก, ลบ=เชิงลบ, 0=เป็นกลาง>,
+  "sentiment_label": "<positive|neutral|negative>",
+  "summary": "<สรุปข่าวสำคัญเป็นภาษาไทย 2-3 ประโยค>",
+  "top_themes": [<รายการหัวข้อสำคัญ เช่น "pricing", "expansion", "service_issue", "promotion", "partnership">],
+  "action_items": "<สิ่งที่ TP Logistics ควรทำตอบสนอง ถ้ามี หรือ null>",
+  "risk_flag": <true ถ้ามีการเปลี่ยนแปลงสำคัญที่กระทบ TP Logistics, false ถ้าไม่มี>
+}}
 """
 
-    response = _perplexity_query(prompt, api_key, system=system)
+    resp = gemini_model.generate_content(prompt)
+    text = resp.text.strip()
 
-    # Parse sections
-    new_findings = response
-    updated_profile = response
+    # Strip markdown code block if present
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
 
-    if "## ข่าวใหม่" in response and "## ภาพรวมปัจจุบัน" in response:
-        parts = response.split("## ภาพรวมปัจจุบัน", 1)
-        new_findings = parts[0].replace("## ข่าวใหม่", "").strip()
-        updated_profile = parts[1].strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("Gemini returned non-JSON for %s, using defaults", company["id"])
+        data = {
+            "sentiment_score": 0,
+            "sentiment_label": "neutral",
+            "summary": raw_news[:500],
+            "top_themes": [],
+            "action_items": None,
+            "risk_flag": False,
+        }
 
-    has_alert = _detect_alert(new_findings)
-
-    return {
-        "new_findings": new_findings,
-        "updated_profile": updated_profile,
-        "has_alert": has_alert,
-    }
+    return data
 
 
-def run_monitor_cycle(api_key: str, time_slot: str | None = None) -> dict:
+# ─── Gemini: Generate on-demand report ──────────────────────────────────────
+
+
+def generate_report(date_from: str, date_to: str, gemini_api_key: str) -> str:
+    """Generate a comprehensive report from daily snapshots in a date range."""
+    snapshots = db.get_snapshots_by_date_range(date_from, date_to)
+
+    if not snapshots:
+        return f"# ไม่พบข้อมูล\n\nไม่พบ snapshot ในช่วง {date_from} ถึง {date_to}"
+
+    # Group by company
+    by_company: dict[str, list[dict]] = {}
+    for s in snapshots:
+        by_company.setdefault(s["company_id"], []).append(s)
+
+    # Build context for Gemini
+    context_parts = []
+    for cid, items in by_company.items():
+        name = items[0]["company_name"]
+        context_parts.append(f"\n### {name}")
+        for item in items:
+            date = item["snapshot_date"]
+            score = item.get("sentiment_score", "N/A")
+            label = item.get("sentiment_label", "N/A")
+            summary = item.get("summary") or item.get("raw_news", "")[:300]
+            themes = item.get("top_themes", [])
+            action = item.get("action_items") or "-"
+            risk = "⚠️ YES" if item.get("risk_flag") else "No"
+            context_parts.append(
+                f"- **{date}** | Sentiment: {score} ({label}) | Risk: {risk}\n"
+                f"  สรุป: {summary}\n"
+                f"  Themes: {', '.join(themes) if themes else '-'}\n"
+                f"  Action: {action}"
+            )
+
+    context = "\n".join(context_parts)
+
+    genai.configure(api_key=gemini_api_key)
+    model = genai.GenerativeModel("gemini-2.0-flash")
+
+    prompt = f"""คุณเป็นที่ปรึกษาด้านกลยุทธ์ตลาดขนส่งไทยระดับ Senior ให้กับ TP Logistics
+สร้างรายงานวิเคราะห์คู่แข่งจากข้อมูลช่วง {date_from} ถึง {date_to}
+
+--- ข้อมูล Daily Snapshots ---
+{context}
+--- จบข้อมูล ---
+
+เขียนรายงานเป็น Markdown ภาษาไทย ตามโครงสร้างนี้:
+
+# 📊 รายงานวิเคราะห์คู่แข่ง
+**ช่วงเวลา:** {date_from} ถึง {date_to}
+
+## Executive Summary
+สรุปภาพรวมตลาดขนส่งในช่วงนี้ 3-5 ประโยค
+
+## วิเคราะห์รายแบรนด์
+
+(สำหรับแต่ละแบรนด์ที่มีข้อมูล:)
+### [ชื่อแบรนด์]
+- **Sentiment Score:** [คะแนน] ([label])
+- **Top Themes:** [หัวข้อสำคัญ]
+- **สรุป:** [วิเคราะห์สถานการณ์]
+- **Action:** [สิ่งที่ TP Logistics ควรตอบสนอง]
+
+## Cross-brand Insights
+วิเคราะห์เปรียบเทียบข้ามแบรนด์ แนวโน้มร่วม ความแตกต่าง
+
+## Strategic Implications สำหรับ TP Logistics
+คำแนะนำเชิงกลยุทธ์สำหรับ TP Logistics โดยเฉพาะ
+
+## ⚠️ Risk Flags
+รายการความเสี่ยงที่ต้องจับตา (ถ้ามี) หรือระบุว่าไม่พบความเสี่ยงสำคัญ
+"""
+
+    resp = model.generate_content(prompt)
+    return resp.text
+
+
+# ─── Daily Monitor Cycle ────────────────────────────────────────────────────
+
+
+def run_monitor_cycle(perplexity_key: str, gemini_key: str) -> dict:
     """
-    Main cycle — runs for all 6 companies sequentially.
-    Returns summary of what was processed.
+    Main daily cycle — runs for all 7 companies.
+    Perplexity search → Gemini analysis → save to Supabase.
     """
     now_bkk = datetime.now(TZ_BANGKOK)
     snapshot_date = now_bkk.strftime("%Y-%m-%d")
 
-    if time_slot is None:
-        # Round to nearest scheduled slot
-        hour = now_bkk.hour
-        slots = {9: "09:00", 12: "12:00", 15: "15:00", 18: "18:00"}
-        time_slot = slots.get(hour) or f"{hour:02d}:00"
+    logger.info("Starting daily monitor cycle: %s", snapshot_date)
 
-    logger.info("Starting monitor cycle: %s %s", snapshot_date, time_slot)
-    results = {"success": [], "failed": []}
+    # Init Gemini
+    genai.configure(api_key=gemini_key)
+    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+
+    results = {"date": snapshot_date, "success": [], "failed": []}
 
     for company in COMPANIES:
         try:
-            # Get last cumulative summary
-            last = db.get_summary(company["id"])
-            old_summary = last["summary"] if last else None
-            old_updated = last["updated_at"] if last else None
+            # Step 1: Perplexity search
+            raw_news = _perplexity_search(company, perplexity_key)
+            logger.info("  [perplexity] %s — got %d chars", company["name"], len(raw_news))
 
-            # Search + build updated profile (single Perplexity call)
-            result = _search_and_update(company, old_summary, old_updated, api_key)
+            # Step 2: Gemini analysis
+            analysis = _gemini_analyze_brand(company, raw_news, gemini_model)
+            logger.info("  [gemini] %s — sentiment=%.1f (%s), risk=%s",
+                        company["name"],
+                        analysis.get("sentiment_score", 0),
+                        analysis.get("sentiment_label", "?"),
+                        analysis.get("risk_flag", False))
 
-            # Save raw findings as snapshot
-            db.save_snapshot(
+            # Step 3: Save to Supabase
+            db.save_daily_snapshot(
                 company_id=company["id"],
                 company_name=company["name"],
-                content=result["new_findings"],
-                has_alert=result["has_alert"],
                 snapshot_date=snapshot_date,
-                snapshot_time_slot=time_slot,
-            )
-
-            # Upsert cumulative summary
-            db.upsert_summary(
-                company_id=company["id"],
-                company_name=company["name"],
-                summary=result["updated_profile"],
-                has_alert=result["has_alert"],
+                raw_news=raw_news,
+                sentiment_score=analysis.get("sentiment_score"),
+                sentiment_label=analysis.get("sentiment_label"),
+                summary=analysis.get("summary"),
+                top_themes=analysis.get("top_themes", []),
+                action_items=analysis.get("action_items"),
+                risk_flag=analysis.get("risk_flag", False),
             )
 
             results["success"].append(company["id"])
-            logger.info("  ✓ %s — alert=%s", company["name"], result["has_alert"])
+            logger.info("  ✓ %s — saved", company["name"])
 
-            # Small delay between Perplexity calls to avoid rate limiting
             time.sleep(2)
 
         except Exception as exc:
