@@ -18,7 +18,7 @@ export default function App() {
   const [runStatus, setRunStatus] = useState("");
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const stored = localStorage.getItem("darkMode");
-    return stored !== null ? stored === "true" : true;
+    return stored !== null ? stored === "true" : false;
   });
 
   useEffect(() => {
