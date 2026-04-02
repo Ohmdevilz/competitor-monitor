@@ -1,5 +1,7 @@
 import os
+import json
 import logging
+from datetime import datetime, timezone
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -8,6 +10,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 _client: Client | None = None
+
 
 def get_client() -> Client:
     global _client
@@ -18,77 +21,73 @@ def get_client() -> Client:
     return _client
 
 
-def get_all_summaries() -> list[dict]:
-    resp = get_client().table("competitor_summary").select("*").order("company_name").execute()
-    return resp.data or []
+# ─── Daily Snapshots (V2) ───────────────────────────────────────────────────
 
 
-def upsert_summary(company_id: str, company_name: str, summary: str, has_alert: bool) -> None:
-    from datetime import datetime, timezone
-    resp = get_client().table("competitor_summary").upsert({
+def save_daily_snapshot(
+    company_id: str,
+    company_name: str,
+    snapshot_date: str,
+    raw_news: str,
+    sentiment_score: float | None = None,
+    sentiment_label: str | None = None,
+    summary: str | None = None,
+    top_themes: list[str] | None = None,
+    action_items: str | None = None,
+    risk_flag: bool = False,
+) -> None:
+    row = {
         "company_id": company_id,
         "company_name": company_name,
+        "snapshot_date": snapshot_date,
+        "raw_news": raw_news,
+        "sentiment_score": sentiment_score,
+        "sentiment_label": sentiment_label,
         "summary": summary,
-        "has_alert": has_alert,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }, on_conflict="company_id").execute()
-    if resp is None:
-        logger.error("[upsert_summary] got None response for company_id=%s", company_id)
-
-
-def get_summary(company_id: str) -> dict | None:
-    # maybe_single().execute() returns None (not a response with data=None)
-    # when zero rows match, so we must check resp itself before accessing .data
+        "top_themes": json.dumps(top_themes or []),
+        "action_items": action_items,
+        "risk_flag": risk_flag,
+    }
     resp = (
         get_client()
-        .table("competitor_summary")
-        .select("*")
-        .eq("company_id", company_id)
-        .maybe_single()
+        .table("daily_snapshots")
+        .upsert(row, on_conflict="company_id,snapshot_date")
         .execute()
     )
     if resp is None:
-        return None
-    return resp.data if isinstance(resp.data, dict) else None
+        logger.error("[save_daily_snapshot] got None response for %s/%s", company_id, snapshot_date)
 
 
-def save_snapshot(
-    company_id: str,
-    company_name: str,
-    content: str,
-    has_alert: bool,
-    snapshot_date: str,
-    snapshot_time_slot: str,
-) -> None:
-    resp = get_client().table("competitor_snapshots").insert({
-        "company_id": company_id,
-        "company_name": company_name,
-        "content": content,
-        "has_alert": has_alert,
-        "snapshot_date": snapshot_date,
-        "snapshot_time_slot": snapshot_time_slot,
-    }).execute()
-    if resp is None:
-        logger.error("[save_snapshot] got None response for company_id=%s", company_id)
-
-
-def get_snapshots(snapshot_date: str, snapshot_time_slot: str) -> list[dict]:
+def get_daily_snapshots(snapshot_date: str) -> list[dict]:
     resp = (
         get_client()
-        .table("competitor_snapshots")
+        .table("daily_snapshots")
         .select("*")
         .eq("snapshot_date", snapshot_date)
-        .eq("snapshot_time_slot", snapshot_time_slot)
         .order("company_name")
         .execute()
     )
     return resp.data or []
 
 
-def get_available_dates() -> list[str]:
+def get_snapshots_by_date_range(date_from: str, date_to: str) -> list[dict]:
     resp = (
         get_client()
-        .table("competitor_snapshots")
+        .table("daily_snapshots")
+        .select("*")
+        .gte("snapshot_date", date_from)
+        .lte("snapshot_date", date_to)
+        .order("snapshot_date", desc=True)
+        .order("company_name")
+        .execute()
+    )
+    return resp.data or []
+
+
+def get_available_snapshot_dates() -> list[str]:
+    resp = (
+        get_client()
+        .table("daily_snapshots")
         .select("snapshot_date")
         .order("snapshot_date", desc=True)
         .execute()
@@ -101,14 +100,50 @@ def get_available_dates() -> list[str]:
     return seen
 
 
-def get_available_slots(snapshot_date: str) -> list[str]:
+# ─── Generated Reports ──────────────────────────────────────────────────────
+
+
+def save_report(date_from: str, date_to: str, report_md: str) -> dict:
+    row = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "report_md": report_md,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    resp = get_client().table("generated_reports").insert(row).execute()
+    if resp and resp.data:
+        return resp.data[0]
+    return row
+
+
+def get_reports() -> list[dict]:
     resp = (
         get_client()
-        .table("competitor_snapshots")
-        .select("snapshot_time_slot")
-        .eq("snapshot_date", snapshot_date)
+        .table("generated_reports")
+        .select("*")
+        .order("created_at", desc=True)
         .execute()
     )
-    ORDER = ["09:00", "12:00", "15:00", "18:00"]
-    seen = set(row["snapshot_time_slot"] for row in (resp.data or []))
-    return [s for s in ORDER if s in seen]
+    return resp.data or []
+
+
+# ─── Legacy functions (backward compat) ─────────────────────────────────────
+
+
+def get_all_summaries() -> list[dict]:
+    resp = get_client().table("competitor_summary").select("*").order("company_name").execute()
+    return resp.data or []
+
+
+def get_summary(company_id: str) -> dict | None:
+    resp = (
+        get_client()
+        .table("competitor_summary")
+        .select("*")
+        .eq("company_id", company_id)
+        .maybe_single()
+        .execute()
+    )
+    if resp is None:
+        return None
+    return resp.data if isinstance(resp.data, dict) else None
