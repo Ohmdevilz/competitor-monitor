@@ -25,16 +25,20 @@ def get_all_summaries() -> list[dict]:
 
 def upsert_summary(company_id: str, company_name: str, summary: str, has_alert: bool) -> None:
     from datetime import datetime, timezone
-    get_client().table("competitor_summary").upsert({
+    resp = get_client().table("competitor_summary").upsert({
         "company_id": company_id,
         "company_name": company_name,
         "summary": summary,
         "has_alert": has_alert,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }, on_conflict="company_id").execute()
+    if resp is None:
+        logger.error("[upsert_summary] got None response for company_id=%s", company_id)
 
 
 def get_summary(company_id: str) -> dict | None:
+    # maybe_single().execute() returns None (not a response with data=None)
+    # when zero rows match, so we must check resp itself before accessing .data
     resp = (
         get_client()
         .table("competitor_summary")
@@ -43,14 +47,9 @@ def get_summary(company_id: str) -> dict | None:
         .maybe_single()
         .execute()
     )
-    logger.info("[get_summary] company_id=%s | resp type=%s | repr=%s",
-                company_id, type(resp).__name__, repr(resp)[:300])
-    if not hasattr(resp, "data"):
-        logger.error("[get_summary] resp has NO .data attribute — returning None")
+    if resp is None:
         return None
-    logger.info("[get_summary] resp.data type=%s | repr=%s",
-                type(resp.data).__name__, repr(resp.data)[:300])
-    return resp.data
+    return resp.data if isinstance(resp.data, dict) else None
 
 
 def save_snapshot(
@@ -61,7 +60,7 @@ def save_snapshot(
     snapshot_date: str,
     snapshot_time_slot: str,
 ) -> None:
-    get_client().table("competitor_snapshots").insert({
+    resp = get_client().table("competitor_snapshots").insert({
         "company_id": company_id,
         "company_name": company_name,
         "content": content,
@@ -69,6 +68,8 @@ def save_snapshot(
         "snapshot_date": snapshot_date,
         "snapshot_time_slot": snapshot_time_slot,
     }).execute()
+    if resp is None:
+        logger.error("[save_snapshot] got None response for company_id=%s", company_id)
 
 
 def get_snapshots(snapshot_date: str, snapshot_time_slot: str) -> list[dict]:
