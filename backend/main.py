@@ -15,6 +15,11 @@ import database as db
 from monitor import COMPANIES, run_monitor_cycle, generate_report
 from scheduler import create_scheduler
 
+
+def _get_gemini_key() -> str:
+    return os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
+
+
 scheduler = create_scheduler()
 
 
@@ -57,9 +62,9 @@ def create_report(
     date_to: str = Query(..., description="End date YYYY-MM-DD"),
 ):
     """Generate on-demand report for a date range via Gemini"""
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    gemini_key = _get_gemini_key()
     if not gemini_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY / GOOGLE_API_KEY not configured")
 
     report_md = generate_report(date_from, date_to, gemini_key)
     saved = db.save_report(date_from, date_to, report_md)
@@ -76,11 +81,11 @@ def get_reports():
 def run_now():
     """Trigger daily monitor cycle manually"""
     perplexity_key = os.getenv("PERPLEXITY_API_KEY", "")
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    gemini_key = _get_gemini_key()
     if not perplexity_key:
         raise HTTPException(status_code=500, detail="PERPLEXITY_API_KEY not configured")
     if not gemini_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY / GOOGLE_API_KEY not configured")
 
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor() as pool:
