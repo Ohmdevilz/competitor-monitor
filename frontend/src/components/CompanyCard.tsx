@@ -60,7 +60,7 @@ export default function CompanyCard({ data }: Props) {
         {data.summary || data.raw_news || <span className="no-data">ยังไม่มีข้อมูล</span>}
       </div>
 
-      {data.action_items && (
+      {data.action_items && data.company_id !== "tp_logistics" && (
         <div className="card-action">
           <strong>Action:</strong> {data.action_items}
         </div>
