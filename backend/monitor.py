@@ -173,9 +173,9 @@ def _parse_gemini_json(gemini_client, prompt: str, company_id: str, raw_news: st
 # ─── Gemini: Generate on-demand report ──────────────────────────────────────
 
 
-def generate_report(date_from: str, date_to: str, gemini_api_key: str) -> str:
+def generate_report(date_from: str, date_to: str, gemini_api_key: str, trigger_source: str = "all") -> str:
     """Generate a comprehensive report from daily snapshots in a date range."""
-    snapshots = db.get_snapshots_by_date_range(date_from, date_to)
+    snapshots = db.get_snapshots_by_date_range(date_from, date_to, trigger_source)
 
     if not snapshots:
         return f"# ไม่พบข้อมูล\n\nไม่พบ snapshot ในช่วง {date_from} ถึง {date_to}"
@@ -257,13 +257,14 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str, trigger_source: str 
     """
     now_bkk = datetime.now(TZ_BANGKOK)
     snapshot_date = now_bkk.strftime("%Y-%m-%d")
+    snapshot_time = now_bkk.strftime("%H:%M")
 
-    logger.info("Starting daily monitor cycle: %s", snapshot_date)
+    logger.info("Starting daily monitor cycle: %s %s", snapshot_date, snapshot_time)
 
     # Init Gemini
     gemini_client = genai.Client(api_key=gemini_key)
 
-    results = {"date": snapshot_date, "success": [], "failed": []}
+    results = {"date": snapshot_date, "time": snapshot_time, "success": [], "failed": []}
 
     # Separate TP Logistics from competitors
     competitors = [c for c in COMPANIES if c["id"] != "tp_logistics"]
@@ -289,7 +290,7 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str, trigger_source: str 
                 "action": analysis.get("action_items"),
             })
 
-            _save_snapshot(company, snapshot_date, raw_news, analysis, trigger_source)
+            _save_snapshot(company, snapshot_date, snapshot_time, raw_news, analysis, trigger_source)
             results["success"].append(company["id"])
             logger.info("  ✓ %s — saved", company["name"])
             time.sleep(2)
@@ -310,7 +311,7 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str, trigger_source: str 
                     analysis.get("sentiment_label", "?"),
                     analysis.get("risk_flag", False))
 
-        _save_snapshot(tp_company, snapshot_date, raw_news, analysis, trigger_source)
+        _save_snapshot(tp_company, snapshot_date, snapshot_time, raw_news, analysis, trigger_source)
         results["success"].append(tp_company["id"])
         logger.info("  ✓ %s — saved", tp_company["name"])
 
@@ -322,11 +323,12 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str, trigger_source: str 
     return results
 
 
-def _save_snapshot(company: dict, snapshot_date: str, raw_news: str, analysis: dict, trigger_source: str) -> None:
+def _save_snapshot(company: dict, snapshot_date: str, snapshot_time: str, raw_news: str, analysis: dict, trigger_source: str) -> None:
     db.save_daily_snapshot(
         company_id=company["id"],
         company_name=company["name"],
         snapshot_date=snapshot_date,
+        snapshot_time=snapshot_time,
         raw_news=raw_news,
         sentiment_score=analysis.get("sentiment_score"),
         sentiment_label=analysis.get("sentiment_label"),

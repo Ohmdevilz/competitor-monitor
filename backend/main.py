@@ -45,28 +45,29 @@ app.add_middleware(
 
 
 @app.get("/api/daily")
-def get_daily(date: str):
-    """ดึง Daily Snapshots ของวันที่ระบุ"""
-    return db.get_daily_snapshots(date)
+def get_daily(date: str, time: str):
+    """ดึง Daily Snapshots ของวันที่+เวลาที่ระบุ"""
+    return db.get_daily_snapshots(date, time)
 
 
-@app.get("/api/dates")
-def get_dates():
-    """ดึงรายการวันที่ที่มี daily snapshot"""
-    return db.get_available_snapshot_dates()
+@app.get("/api/runs")
+def get_runs():
+    """ดึงรายการ runs ที่มี (date + time + trigger_source)"""
+    return db.get_available_runs()
 
 
 @app.post("/api/report")
 def create_report(
     date_from: str = Query(..., description="Start date YYYY-MM-DD"),
     date_to: str = Query(..., description="End date YYYY-MM-DD"),
+    trigger_source: str = Query("all", description="Filter: all | scheduled | manual"),
 ):
     """Generate on-demand report for a date range via Gemini"""
     gemini_key = _get_gemini_key()
     if not gemini_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY / GOOGLE_API_KEY not configured")
 
-    report_md = generate_report(date_from, date_to, gemini_key)
+    report_md = generate_report(date_from, date_to, gemini_key, trigger_source)
     saved = db.save_report(date_from, date_to, report_md)
     return {"report_md": report_md, "date_from": date_from, "date_to": date_to, "id": saved.get("id")}
 
