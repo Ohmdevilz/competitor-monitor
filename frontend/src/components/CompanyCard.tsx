@@ -16,7 +16,17 @@ function formatScore(score: number | null): string {
   return `${sign}${score.toFixed(1)}`;
 }
 
+function parseThemes(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) return parsed; } catch {}
+    return raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  }
+  return [];
+}
+
 export default function CompanyCard({ data }: Props) {
+  const themes = parseThemes(data.top_themes);
   return (
     <div className={`company-card${data.risk_flag ? " company-card--alert" : ""}`}>
       <div className="card-header">
@@ -38,9 +48,9 @@ export default function CompanyCard({ data }: Props) {
         )}
       </div>
 
-      {data.top_themes && data.top_themes.length > 0 && (
+      {themes.length > 0 && (
         <div className="card-themes">
-          {data.top_themes.map((t) => (
+          {themes.map((t) => (
             <span key={t} className="theme-tag">{t}</span>
           ))}
         </div>
