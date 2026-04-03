@@ -204,10 +204,29 @@ def _gemini_analyze_tp(raw_news: str, competitor_actions: list[dict], gemini_cli
     return _parse_gemini_json(gemini_client, prompt, "tp_logistics", raw_news)
 
 
+GEMINI_MAX_RETRIES = 3
+GEMINI_RETRY_DELAY = 60  # seconds
+
+
+def _gemini_call_with_retry(gemini_client, prompt: str) -> str:
+    """Call Gemini with retry on 429 RESOURCE_EXHAUSTED."""
+    for attempt in range(1, GEMINI_MAX_RETRIES + 1):
+        try:
+            resp = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+            return resp.text.strip() if resp.text else ""
+        except Exception as exc:
+            if "429" in str(exc) and attempt < GEMINI_MAX_RETRIES:
+                logger.warning("  [gemini] 429 rate limit — retry %d/%d in %ds",
+                               attempt, GEMINI_MAX_RETRIES, GEMINI_RETRY_DELAY)
+                time.sleep(GEMINI_RETRY_DELAY)
+            else:
+                raise
+    return ""
+
+
 def _parse_gemini_json(gemini_client, prompt: str, company_id: str, raw_news: str) -> dict:
     """Call Gemini and parse JSON response with fallback."""
-    resp = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-    text = resp.text.strip() if resp.text else ""
+    text = _gemini_call_with_retry(gemini_client, prompt)
 
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
@@ -302,8 +321,7 @@ def generate_report(date_from: str, date_to: str, gemini_api_key: str, trigger_s
 รายการความเสี่ยงที่ต้องจับตา (ถ้ามี) หรือระบุว่าไม่พบความเสี่ยงสำคัญ
 """
 
-    resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-    return resp.text or ""
+    return _gemini_call_with_retry(client, prompt)
 
 
 # ─── Daily Monitor Cycle ────────────────────────────────────────────────────
