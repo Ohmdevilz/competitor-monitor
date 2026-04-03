@@ -68,9 +68,9 @@ export default function CompanyCard({ data }: Props) {
         {data.summary || data.raw_news || <span className="no-data">ยังไม่มีข้อมูล</span>}
       </div>
 
-      {data.action_items && (
-        <div className={`card-action${data.company_id === "tp_logistics" ? " card-action--tp" : ""}`}>
-          <strong>{data.company_id === "tp_logistics" ? "สรุปคำแนะนำ:" : "TP ควรตอบสนอง:"}</strong> {data.action_items}
+      {data.action_items && data.company_id === "tp_logistics" && (
+        <div className="card-action card-action--tp">
+          <strong>สรุปคำแนะนำ:</strong> {data.action_items}
         </div>
       )}
     </div>
