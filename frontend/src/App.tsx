@@ -70,6 +70,7 @@ export default function App() {
   }, [selectedRun, loadDaily]);
 
   async function handleRunNow() {
+    if (!window.confirm("ยืนยันการรัน Monitor Cycle?\nจะใช้เวลาประมาณ 2-5 นาที")) return;
     setRunStatus("กำลังรัน...");
     try {
       await triggerRun();
