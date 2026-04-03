@@ -40,7 +40,12 @@ export async function fetchDaily(date: string): Promise<DailySnapshot[]> {
   return res.json();
 }
 
-export async function fetchDates(): Promise<string[]> {
+export interface DateInfo {
+  date: string;
+  trigger_source: string;  // "scheduled" | "manual"
+}
+
+export async function fetchDates(): Promise<DateInfo[]> {
   const res = await fetch(`${BASE}/dates`);
   if (!res.ok) return [];
   return res.json();

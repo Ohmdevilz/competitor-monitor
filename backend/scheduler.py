@@ -24,7 +24,7 @@ def _daily_job():
     if not gemini_key:
         logger.error("GEMINI_API_KEY / GOOGLE_API_KEY not set — skipping cycle")
         return
-    run_monitor_cycle(perplexity_key, gemini_key)
+    run_monitor_cycle(perplexity_key, gemini_key, trigger_source="scheduled")
 
 
 def create_scheduler() -> BackgroundScheduler:

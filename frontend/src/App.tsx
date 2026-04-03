@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import type { DailySnapshot } from "./api";
+import type { DailySnapshot, DateInfo } from "./api";
 import { fetchDaily, fetchDates, triggerRun } from "./api";
 import CompanyCard from "./components/CompanyCard";
 import ReportView from "./components/ReportView";
@@ -25,7 +25,7 @@ export default function App() {
   const [data, setData] = useState<DailySnapshot[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [selectedDate, setSelectedDate] = useState("");
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [availableDates, setAvailableDates] = useState<DateInfo[]>([]);
   const [runStatus, setRunStatus] = useState("");
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const stored = localStorage.getItem("darkMode");
@@ -42,7 +42,7 @@ export default function App() {
     fetchDates().then((dates) => {
       setAvailableDates(dates);
       if (dates.length > 0 && !selectedDate) {
-        setSelectedDate(dates[0]);
+        setSelectedDate(dates[0].date);
       }
     }).catch(console.error);
   }, []);
@@ -72,8 +72,8 @@ export default function App() {
       const dates = await fetchDates();
       setAvailableDates(dates);
       if (dates.length > 0) {
-        setSelectedDate(dates[0]);
-        await loadDaily(dates[0]);
+        setSelectedDate(dates[0].date);
+        await loadDaily(dates[0].date);
       }
       setRunStatus("");
     } catch {
@@ -120,7 +120,9 @@ export default function App() {
             >
               <option value="">— เลือกวันที่ —</option>
               {availableDates.map((d) => (
-                <option key={d} value={d}>{d}</option>
+                <option key={d.date} value={d.date}>
+                  {d.date} [{d.trigger_source === "scheduled" ? "Scheduled" : "Manual"}]
+                </option>
               ))}
             </select>
             {selectedDate && (

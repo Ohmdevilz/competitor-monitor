@@ -204,7 +204,7 @@ def generate_report(date_from: str, date_to: str, gemini_api_key: str) -> str:
 # ─── Daily Monitor Cycle ────────────────────────────────────────────────────
 
 
-def run_monitor_cycle(perplexity_key: str, gemini_key: str) -> dict:
+def run_monitor_cycle(perplexity_key: str, gemini_key: str, trigger_source: str = "manual") -> dict:
     """
     Main daily cycle — runs for all 7 companies.
     Perplexity search → Gemini analysis → save to Supabase.
@@ -245,6 +245,7 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str) -> dict:
                 top_themes=analysis.get("top_themes", []),
                 action_items=analysis.get("action_items"),
                 risk_flag=analysis.get("risk_flag", False),
+                trigger_source=trigger_source,
             )
 
             results["success"].append(company["id"])

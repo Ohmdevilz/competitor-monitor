@@ -16,6 +16,7 @@ create table if not exists daily_snapshots (
   top_themes      jsonb default '[]'::jsonb,    -- ["pricing","expansion",...]
   action_items    text,                         -- recommended actions
   risk_flag       boolean not null default false,
+  trigger_source  text not null default 'manual',   -- 'scheduled' | 'manual'
   created_at      timestamptz not null default now(),
   unique(company_id, snapshot_date)
 );

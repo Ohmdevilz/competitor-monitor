@@ -35,6 +35,7 @@ def save_daily_snapshot(
     top_themes: list[str] | None = None,
     action_items: str | None = None,
     risk_flag: bool = False,
+    trigger_source: str = "manual",
 ) -> None:
     row = {
         "company_id": company_id,
@@ -47,6 +48,7 @@ def save_daily_snapshot(
         "top_themes": json.dumps(top_themes or []),
         "action_items": action_items,
         "risk_flag": risk_flag,
+        "trigger_source": trigger_source,
     }
     resp = (
         get_client()
@@ -84,20 +86,20 @@ def get_snapshots_by_date_range(date_from: str, date_to: str) -> list[dict]:
     return resp.data or []
 
 
-def get_available_snapshot_dates() -> list[str]:
+def get_available_snapshot_dates() -> list[dict]:
     resp = (
         get_client()
         .table("daily_snapshots")
-        .select("snapshot_date")
+        .select("snapshot_date,trigger_source")
         .order("snapshot_date", desc=True)
         .execute()
     )
-    seen = []
+    seen: dict[str, str] = {}
     for row in (resp.data or []):
         d = row["snapshot_date"]
         if d not in seen:
-            seen.append(d)
-    return seen
+            seen[d] = row.get("trigger_source", "manual")
+    return [{"date": d, "trigger_source": src} for d, src in seen.items()]
 
 
 # ─── Generated Reports ──────────────────────────────────────────────────────
