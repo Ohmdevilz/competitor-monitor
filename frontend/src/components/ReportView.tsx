@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
-import { generateReport } from "../api";
-import type { ReportResult } from "../api";
+import { generateReport, fetchReports } from "../api";
+import type { ReportResult, SavedReport } from "../api";
 
 export default function ReportView() {
   const [dateFrom, setDateFrom] = useState("");
@@ -10,14 +10,31 @@ export default function ReportView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [history, setHistory] = useState<SavedReport[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [viewingHistory, setViewingHistory] = useState<SavedReport | null>(null);
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  async function loadHistory() {
+    setHistoryLoading(true);
+    const reports = await fetchReports();
+    setHistory(reports);
+    setHistoryLoading(false);
+  }
+
   async function handleGenerate() {
     if (!dateFrom || !dateTo) return;
     setLoading(true);
     setError("");
     setReport(null);
+    setViewingHistory(null);
     try {
       const result = await generateReport(dateFrom, dateTo);
       setReport(result);
+      await loadHistory();
     } catch {
       setError("เกิดข้อผิดพลาดในการสร้างรายงาน");
     } finally {
@@ -29,8 +46,22 @@ export default function ReportView() {
     window.print();
   }
 
+  function handleViewHistory(item: SavedReport) {
+    setViewingHistory(item);
+    setReport(null);
+  }
+
+  function handleBackToNew() {
+    setViewingHistory(null);
+  }
+
+  const displayReport = viewingHistory
+    ? { report_md: viewingHistory.report_md, date_from: viewingHistory.date_from, date_to: viewingHistory.date_to }
+    : report;
+
   return (
     <div className="report-view">
+      {/* Generate controls */}
       <div className="report-controls">
         <label className="date-label">
           จาก
@@ -43,7 +74,7 @@ export default function ReportView() {
         <button className="btn-generate" onClick={handleGenerate} disabled={loading || !dateFrom || !dateTo}>
           {loading ? "กำลังสร้างรายงาน..." : "สร้างรายงาน"}
         </button>
-        {report && (
+        {displayReport && (
           <button className="btn-export" onClick={handleExportPDF}>
             Export PDF
           </button>
@@ -56,9 +87,39 @@ export default function ReportView() {
         <div className="loading-state">กำลังให้ Gemini วิเคราะห์ข้อมูล... อาจใช้เวลาสักครู่</div>
       )}
 
-      {report && (
-        <div className="report-content" id="report-print-area">
-          <Markdown>{report.report_md}</Markdown>
+      {/* Active report display */}
+      {displayReport && (
+        <>
+          {viewingHistory && (
+            <div className="history-viewing-bar">
+              <span>กำลังดูรายงานเก่า: {viewingHistory.date_from} ถึง {viewingHistory.date_to}</span>
+              <button className="btn-back" onClick={handleBackToNew}>กลับ</button>
+            </div>
+          )}
+          <div className="report-content" id="report-print-area">
+            <Markdown>{displayReport.report_md}</Markdown>
+          </div>
+        </>
+      )}
+
+      {/* History section */}
+      {!loading && !displayReport && (
+        <div className="report-history">
+          <h3 className="history-title">รายงานที่เคยสร้าง</h3>
+          {historyLoading && <div className="loading-state">กำลังโหลด...</div>}
+          {!historyLoading && history.length === 0 && (
+            <div className="empty-state">ยังไม่มีรายงาน — เลือกช่วงวันที่แล้วกด "สร้างรายงาน"</div>
+          )}
+          {!historyLoading && history.map((item) => (
+            <button key={item.id} className="history-item" onClick={() => handleViewHistory(item)}>
+              <div className="history-item-dates">
+                {item.date_from} ถึง {item.date_to}
+              </div>
+              <div className="history-item-meta">
+                สร้างเมื่อ {new Date(item.created_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>

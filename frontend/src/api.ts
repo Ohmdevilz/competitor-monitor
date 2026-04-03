@@ -24,6 +24,14 @@ export interface ReportResult {
   id?: string;
 }
 
+export interface SavedReport {
+  id: string;
+  date_from: string;
+  date_to: string;
+  report_md: string;
+  created_at: string;
+}
+
 // ─── Daily Snapshots ────────────────────────────────────────────────────────
 
 export async function fetchDaily(date: string): Promise<DailySnapshot[]> {
@@ -46,6 +54,12 @@ export async function generateReport(dateFrom: string, dateTo: string): Promise<
     { method: "POST" },
   );
   if (!res.ok) throw new Error("Failed to generate report");
+  return res.json();
+}
+
+export async function fetchReports(): Promise<SavedReport[]> {
+  const res = await fetch(`${BASE}/reports`);
+  if (!res.ok) return [];
   return res.json();
 }
 

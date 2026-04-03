@@ -352,6 +352,63 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
 .report-content li { margin-bottom: 4px; }
 .report-content strong { color: var(--text); }
 
+/* ─── Report History ───────────────────────────────────────────────────────── */
+.report-history { margin-top: 8px; }
+
+.history-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  text-align: left;
+  font-family: var(--sans);
+  color: var(--text);
+}
+.history-item:hover { border-color: var(--accent); }
+
+.history-item-dates { font-size: 0.9rem; font-weight: 600; }
+.history-item-meta { font-size: 0.75rem; color: var(--text-dim); }
+
+.history-viewing-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--accent-glow);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.btn-back {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 14px;
+  font: 600 0.8rem var(--sans);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.btn-back:hover { border-color: var(--accent); }
+
 /* ─── States ───────────────────────────────────────────────────────────────── */
 .loading-state, .error-state, .empty-state {
   grid-column: 1 / -1;
