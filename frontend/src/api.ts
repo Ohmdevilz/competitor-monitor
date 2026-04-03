@@ -71,6 +71,12 @@ export async function fetchReports(): Promise<SavedReport[]> {
 // ─── Manual Run ─────────────────────────────────────────────────────────────
 
 export async function triggerRun(): Promise<void> {
-  const res = await fetch(`${BASE}/run`, { method: "POST" });
-  if (!res.ok) throw new Error("Failed to trigger run");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 min
+  try {
+    const res = await fetch(`${BASE}/run`, { method: "POST", signal: controller.signal });
+    if (!res.ok) throw new Error("Failed to trigger run");
+  } finally {
+    clearTimeout(timeout);
+  }
 }
