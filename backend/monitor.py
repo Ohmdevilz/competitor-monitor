@@ -9,7 +9,7 @@ import re
 import time
 from datetime import datetime
 
-import google.generativeai as genai
+from google import genai
 import pytz
 import requests
 
@@ -80,7 +80,7 @@ def _perplexity_search(company: dict, api_key: str) -> str:
 # ─── Gemini: Analyze single brand ───────────────────────────────────────────
 
 
-def _gemini_analyze_brand(company: dict, raw_news: str, gemini_model) -> dict:
+def _gemini_analyze_brand(company: dict, raw_news: str, gemini_client) -> dict:
     """Use Gemini to analyze sentiment + summarize a single brand's news."""
 
     prompt = f"""คุณเป็นนักวิเคราะห์ตลาดขนส่งไทย วิเคราะห์ข่าวต่อไปนี้ของ {company['name']}:
@@ -100,8 +100,8 @@ def _gemini_analyze_brand(company: dict, raw_news: str, gemini_model) -> dict:
 }}
 """
 
-    resp = gemini_model.generate_content(prompt)
-    text = resp.text.strip()
+    resp = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    text = resp.text.strip() if resp.text else ""
 
     # Strip markdown code block if present
     if text.startswith("```"):
@@ -161,8 +161,7 @@ def generate_report(date_from: str, date_to: str, gemini_api_key: str) -> str:
 
     context = "\n".join(context_parts)
 
-    genai.configure(api_key=gemini_api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    client = genai.Client(api_key=gemini_api_key)
 
     prompt = f"""คุณเป็นที่ปรึกษาด้านกลยุทธ์ตลาดขนส่งไทยระดับ Senior ให้กับ TP Logistics
 สร้างรายงานวิเคราะห์คู่แข่งจากข้อมูลช่วง {date_from} ถึง {date_to}
@@ -198,8 +197,8 @@ def generate_report(date_from: str, date_to: str, gemini_api_key: str) -> str:
 รายการความเสี่ยงที่ต้องจับตา (ถ้ามี) หรือระบุว่าไม่พบความเสี่ยงสำคัญ
 """
 
-    resp = model.generate_content(prompt)
-    return resp.text
+    resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    return resp.text or ""
 
 
 # ─── Daily Monitor Cycle ────────────────────────────────────────────────────
@@ -216,8 +215,7 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str) -> dict:
     logger.info("Starting daily monitor cycle: %s", snapshot_date)
 
     # Init Gemini
-    genai.configure(api_key=gemini_key)
-    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+    gemini_client = genai.Client(api_key=gemini_key)
 
     results = {"date": snapshot_date, "success": [], "failed": []}
 
@@ -228,7 +226,7 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str) -> dict:
             logger.info("  [perplexity] %s — got %d chars", company["name"], len(raw_news))
 
             # Step 2: Gemini analysis
-            analysis = _gemini_analyze_brand(company, raw_news, gemini_model)
+            analysis = _gemini_analyze_brand(company, raw_news, gemini_client)
             logger.info("  [gemini] %s — sentiment=%.1f (%s), risk=%s",
                         company["name"],
                         analysis.get("sentiment_score", 0),

@@ -17,12 +17,12 @@ TZ_BANGKOK = pytz.timezone("Asia/Bangkok")
 
 def _daily_job():
     perplexity_key = os.getenv("PERPLEXITY_API_KEY", "")
-    gemini_key = os.getenv("GOOGLE_API_KEY", "")
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
     if not perplexity_key:
         logger.error("PERPLEXITY_API_KEY not set — skipping cycle")
         return
     if not gemini_key:
-        logger.error("GOOGLE_API_KEY not set — skipping cycle")
+        logger.error("GEMINI_API_KEY not set — skipping cycle")
         return
     run_monitor_cycle(perplexity_key, gemini_key)
 
