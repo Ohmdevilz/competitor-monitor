@@ -91,7 +91,7 @@ def run_now():
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor() as pool:
         future = pool.submit(run_monitor_cycle, perplexity_key, gemini_key)
-        result = future.result(timeout=600)
+        result = future.result(timeout=1800)  # 30 min (retries may take long)
     return result
 
 
