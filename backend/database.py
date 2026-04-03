@@ -28,6 +28,7 @@ def save_daily_snapshot(
     company_id: str,
     company_name: str,
     snapshot_date: str,
+    snapshot_time: str,
     raw_news: str,
     sentiment_score: float | None = None,
     sentiment_label: str | None = None,
@@ -41,6 +42,7 @@ def save_daily_snapshot(
         "company_id": company_id,
         "company_name": company_name,
         "snapshot_date": snapshot_date,
+        "snapshot_time": snapshot_time,
         "raw_news": raw_news,
         "sentiment_score": sentiment_score,
         "sentiment_label": sentiment_label,
@@ -53,59 +55,77 @@ def save_daily_snapshot(
     resp = (
         get_client()
         .table("daily_snapshots")
-        .upsert(row, on_conflict="company_id,snapshot_date")
+        .upsert(row, on_conflict="company_id,snapshot_date,snapshot_time")
         .execute()
     )
     if resp is None:
-        logger.error("[save_daily_snapshot] got None response for %s/%s", company_id, snapshot_date)
+        logger.error("[save_daily_snapshot] got None response for %s/%s %s", company_id, snapshot_date, snapshot_time)
 
 
-def get_daily_snapshots(snapshot_date: str) -> list[dict]:
+def get_daily_snapshots(snapshot_date: str, snapshot_time: str) -> list[dict]:
     resp = (
         get_client()
         .table("daily_snapshots")
         .select("*")
         .eq("snapshot_date", snapshot_date)
+        .eq("snapshot_time", snapshot_time)
         .order("company_name")
         .execute()
     )
     return resp.data or []
 
 
-def get_snapshots_by_date_range(date_from: str, date_to: str) -> list[dict]:
-    resp = (
+def get_snapshots_by_date_range(
+    date_from: str,
+    date_to: str,
+    trigger_source: str | None = None,
+) -> list[dict]:
+    q = (
         get_client()
         .table("daily_snapshots")
         .select("*")
         .gte("snapshot_date", date_from)
         .lte("snapshot_date", date_to)
-        .order("snapshot_date", desc=True)
+    )
+    if trigger_source and trigger_source != "all":
+        q = q.eq("trigger_source", trigger_source)
+    resp = (
+        q.order("snapshot_date", desc=True)
+        .order("snapshot_time", desc=True)
         .order("company_name")
         .execute()
     )
     return resp.data or []
 
 
-def get_available_snapshot_dates() -> list[dict]:
+def get_available_runs() -> list[dict]:
+    """Return unique (date, time, trigger_source) combos, newest first."""
     resp = (
         get_client()
         .table("daily_snapshots")
-        .select("snapshot_date,trigger_source")
+        .select("snapshot_date,snapshot_time,trigger_source")
         .order("snapshot_date", desc=True)
+        .order("snapshot_time", desc=True)
         .execute()
     )
-    seen: dict[str, str] = {}
+    seen: set[str] = set()
+    runs: list[dict] = []
     for row in (resp.data or []):
-        d = row["snapshot_date"]
-        if d not in seen:
-            seen[d] = row.get("trigger_source", "manual")
-    return [{"date": d, "trigger_source": src} for d, src in seen.items()]
+        key = f"{row['snapshot_date']}_{row['snapshot_time']}"
+        if key not in seen:
+            seen.add(key)
+            runs.append({
+                "date": row["snapshot_date"],
+                "time": row["snapshot_time"],
+                "trigger_source": row.get("trigger_source", "manual"),
+            })
+    return runs
 
 
 # ─── Generated Reports ──────────────────────────────────────────────────────
 
 
-def save_report(date_from: str, date_to: str, report_md: str) -> dict:
+def save_report(date_from: str, date_to: str, report_md: str, trigger_filter: str = "all") -> dict:
     row = {
         "date_from": date_from,
         "date_to": date_to,
