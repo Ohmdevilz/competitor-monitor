@@ -80,30 +80,76 @@ def _perplexity_search(company: dict, api_key: str) -> str:
 # ─── Gemini: Analyze single brand ───────────────────────────────────────────
 
 
-def _gemini_analyze_brand(company: dict, raw_news: str, gemini_client) -> dict:
-    """Use Gemini to analyze sentiment + summarize a single brand's news."""
+def _gemini_analyze_competitor(company: dict, raw_news: str, gemini_client) -> dict:
+    """Use Gemini to analyze sentiment of a competitor brand's news."""
 
-    prompt = f"""คุณเป็นนักวิเคราะห์ตลาดขนส่งไทย วิเคราะห์ข่าวต่อไปนี้ของ {company['name']}:
+    prompt = f"""คุณเป็นนักวิเคราะห์ตลาดขนส่งไทย ให้คำปรึกษาแก่ TP Logistics
+วิเคราะห์ข่าวต่อไปนี้ของคู่แข่ง "{company['name']}":
 
 --- ข่าวดิบ ---
 {raw_news}
 --- จบข่าวดิบ ---
 
+สำคัญ:
+- sentiment_score/sentiment_label = ประเมินว่าข่าวนี้เป็นบวกหรือลบ "ต่อแบรนด์ {company['name']}" (ไม่ใช่ต่อ TP Logistics)
+- action_items = สิ่งที่ "TP Logistics ควรทำ" เพื่อตอบสนองต่อข่าวของ {company['name']} (ต้องขึ้นต้นด้วย "TP Logistics ควร...")
+- risk_flag = ข่าวนี้กระทบ TP Logistics ในเชิงการแข่งขันหรือไม่
+
 ตอบในรูปแบบ JSON เท่านั้น (ไม่ต้องมี markdown code block):
 {{
-  "sentiment_score": <ตัวเลข -10.0 ถึง 10.0, บวก=เชิงบวก, ลบ=เชิงลบ, 0=เป็นกลาง>,
+  "sentiment_score": <ตัวเลข -10.0 ถึง 10.0, บวก=ข่าวดีต่อ {company['name']}, ลบ=ข่าวลบต่อ {company['name']}, 0=เป็นกลาง>,
   "sentiment_label": "<positive|neutral|negative>",
-  "summary": "<สรุปข่าวสำคัญเป็นภาษาไทย 2-3 ประโยค>",
+  "summary": "<สรุปข่าวสำคัญของ {company['name']} เป็นภาษาไทย 2-3 ประโยค>",
   "top_themes": [<รายการหัวข้อสำคัญ เช่น "pricing", "expansion", "service_issue", "promotion", "partnership">],
-  "action_items": "<สิ่งที่ TP Logistics ควรทำตอบสนองต่อข่าวนี้ — ต้องตอบเสมอ ห้ามเป็น null เช่น ติดตามราคา, เตรียมแผนรับมือ, ไม่ต้องดำเนินการเร่งด่วน เป็นต้น>",
+  "action_items": "<สิ่งที่ TP Logistics ควรทำตอบสนองต่อข่าวของ {company['name']} — ต้องตอบเสมอ ห้ามเป็น null ขึ้นต้นด้วย 'TP Logistics ควร...'>",
   "risk_flag": <true ถ้ามีการเปลี่ยนแปลงสำคัญที่กระทบ TP Logistics, false ถ้าไม่มี>
 }}
 """
 
+    return _parse_gemini_json(gemini_client, prompt, company["id"], raw_news)
+
+
+def _gemini_analyze_tp(raw_news: str, competitor_actions: list[dict], gemini_client) -> dict:
+    """Use Gemini to analyze TP Logistics own news + summarize competitor actions."""
+
+    actions_text = "\n".join(
+        f"- {a['name']}: {a['action']}" for a in competitor_actions if a.get("action")
+    )
+
+    prompt = f"""คุณเป็นนักวิเคราะห์ตลาดขนส่งไทย วิเคราะห์ข่าวต่อไปนี้ของ TP Logistics (แบรนด์ของเรา):
+
+--- ข่าวดิบของ TP Logistics ---
+{raw_news}
+--- จบข่าวดิบ ---
+
+--- Action Items จากการวิเคราะห์คู่แข่งทั้ง 6 ราย ---
+{actions_text}
+--- จบ Action Items ---
+
+สำคัญ:
+- sentiment_score/sentiment_label = ประเมินว่าข่าวนี้เป็นบวกหรือลบ "ต่อ TP Logistics"
+- action_items = สรุปคำแนะนำภาพรวมสำหรับ TP Logistics จากทั้งข่าวตัวเองและจากสถานการณ์คู่แข่งทั้ง 6 ราย
+  ขึ้นต้นด้วย "จากสถานการณ์คู่แข่ง TP Logistics ควร..." แล้วสรุปเป็นข้อๆ
+
+ตอบในรูปแบบ JSON เท่านั้น (ไม่ต้องมี markdown code block):
+{{
+  "sentiment_score": <ตัวเลข -10.0 ถึง 10.0, บวก=ข่าวดีต่อ TP Logistics, ลบ=ข่าวลบ, 0=เป็นกลาง>,
+  "sentiment_label": "<positive|neutral|negative>",
+  "summary": "<สรุปข่าวสำคัญของ TP Logistics เป็นภาษาไทย 2-3 ประโยค>",
+  "top_themes": [<รายการหัวข้อสำคัญ>],
+  "action_items": "<สรุปคำแนะนำภาพรวมจากสถานการณ์คู่แข่ง + ข่าวตัวเอง — ต้องตอบเสมอ ห้ามเป็น null>",
+  "risk_flag": <true ถ้ามีความเสี่ยงสำคัญต่อ TP Logistics, false ถ้าไม่มี>
+}}
+"""
+
+    return _parse_gemini_json(gemini_client, prompt, "tp_logistics", raw_news)
+
+
+def _parse_gemini_json(gemini_client, prompt: str, company_id: str, raw_news: str) -> dict:
+    """Call Gemini and parse JSON response with fallback."""
     resp = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
     text = resp.text.strip() if resp.text else ""
 
-    # Strip markdown code block if present
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
@@ -111,7 +157,7 @@ def _gemini_analyze_brand(company: dict, raw_news: str, gemini_client) -> dict:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("Gemini returned non-JSON for %s, using defaults", company["id"])
+        logger.warning("Gemini returned non-JSON for %s, using defaults", company_id)
         data = {
             "sentiment_score": 0,
             "sentiment_label": "neutral",
@@ -219,43 +265,74 @@ def run_monitor_cycle(perplexity_key: str, gemini_key: str, trigger_source: str 
 
     results = {"date": snapshot_date, "success": [], "failed": []}
 
-    for company in COMPANIES:
+    # Separate TP Logistics from competitors
+    competitors = [c for c in COMPANIES if c["id"] != "tp_logistics"]
+    tp_company = next(c for c in COMPANIES if c["id"] == "tp_logistics")
+
+    # Step A: Process all 6 competitors first
+    competitor_actions: list[dict] = []
+
+    for company in competitors:
         try:
-            # Step 1: Perplexity search
             raw_news = _perplexity_search(company, perplexity_key)
             logger.info("  [perplexity] %s — got %d chars", company["name"], len(raw_news))
 
-            # Step 2: Gemini analysis
-            analysis = _gemini_analyze_brand(company, raw_news, gemini_client)
+            analysis = _gemini_analyze_competitor(company, raw_news, gemini_client)
             logger.info("  [gemini] %s — sentiment=%.1f (%s), risk=%s",
                         company["name"],
                         analysis.get("sentiment_score", 0),
                         analysis.get("sentiment_label", "?"),
                         analysis.get("risk_flag", False))
 
-            # Step 3: Save to Supabase
-            db.save_daily_snapshot(
-                company_id=company["id"],
-                company_name=company["name"],
-                snapshot_date=snapshot_date,
-                raw_news=raw_news,
-                sentiment_score=analysis.get("sentiment_score"),
-                sentiment_label=analysis.get("sentiment_label"),
-                summary=analysis.get("summary"),
-                top_themes=analysis.get("top_themes", []),
-                action_items=analysis.get("action_items"),
-                risk_flag=analysis.get("risk_flag", False),
-                trigger_source=trigger_source,
-            )
+            competitor_actions.append({
+                "name": company["name"],
+                "action": analysis.get("action_items"),
+            })
 
+            _save_snapshot(company, snapshot_date, raw_news, analysis, trigger_source)
             results["success"].append(company["id"])
             logger.info("  ✓ %s — saved", company["name"])
-
             time.sleep(2)
 
         except Exception as exc:
             logger.error("  ✗ %s — %s", company["name"], exc)
             results["failed"].append(company["id"])
 
+    # Step B: Process TP Logistics last — with competitor actions as context
+    try:
+        raw_news = _perplexity_search(tp_company, perplexity_key)
+        logger.info("  [perplexity] %s — got %d chars", tp_company["name"], len(raw_news))
+
+        analysis = _gemini_analyze_tp(raw_news, competitor_actions, gemini_client)
+        logger.info("  [gemini] %s — sentiment=%.1f (%s), risk=%s",
+                    tp_company["name"],
+                    analysis.get("sentiment_score", 0),
+                    analysis.get("sentiment_label", "?"),
+                    analysis.get("risk_flag", False))
+
+        _save_snapshot(tp_company, snapshot_date, raw_news, analysis, trigger_source)
+        results["success"].append(tp_company["id"])
+        logger.info("  ✓ %s — saved", tp_company["name"])
+
+    except Exception as exc:
+        logger.error("  ✗ %s — %s", tp_company["name"], exc)
+        results["failed"].append(tp_company["id"])
+
     logger.info("Cycle done: %s/%s success", len(results["success"]), len(COMPANIES))
     return results
+
+
+def _save_snapshot(company: dict, snapshot_date: str, raw_news: str, analysis: dict, trigger_source: str) -> None:
+    db.save_daily_snapshot(
+        company_id=company["id"],
+        company_name=company["name"],
+        snapshot_date=snapshot_date,
+        raw_news=raw_news,
+        sentiment_score=analysis.get("sentiment_score"),
+        sentiment_label=analysis.get("sentiment_label"),
+        summary=analysis.get("summary"),
+        top_themes=analysis.get("top_themes", []),
+        action_items=analysis.get("action_items"),
+        risk_flag=analysis.get("risk_flag", False),
+        trigger_source=trigger_source,
+    )

@@ -40,7 +40,7 @@ export default function CompanyCard({ data }: Props) {
           )}
           <span
             className={`sentiment-badge ${sentimentColor(data.sentiment_label)}`}
-            title="Sentiment Score: +5 = ข่าวดี/ตรึงราคา, 0 = Neutral/ไม่มีข้อมูล, -5 = ข่าวลบ/ขึ้นราคา"
+            title="Sentiment ต่อแบรนด์นี้: +5 = ข่าวดีต่อแบรนด์ (เช่น ขยายบริการ, ตรึงราคา) / 0 = เป็นกลาง / -5 = ข่าวลบต่อแบรนด์ (เช่น ขึ้นราคา, ร้องเรียน)"
           >
             {formatScore(data.sentiment_score)}
           </span>
@@ -68,9 +68,9 @@ export default function CompanyCard({ data }: Props) {
         {data.summary || data.raw_news || <span className="no-data">ยังไม่มีข้อมูล</span>}
       </div>
 
-      {data.action_items && data.company_id !== "tp_logistics" && (
-        <div className="card-action">
-          <strong>Action:</strong> {data.action_items}
+      {data.action_items && (
+        <div className={`card-action${data.company_id === "tp_logistics" ? " card-action--tp" : ""}`}>
+          <strong>{data.company_id === "tp_logistics" ? "สรุปคำแนะนำ:" : "TP ควรตอบสนอง:"}</strong> {data.action_items}
         </div>
       )}
     </div>

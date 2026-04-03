@@ -134,12 +134,13 @@ export default function App() {
 
           <div className="legend">
             <span className="legend-item">
-              <span className="alert-badge">⚠ Risk</span> = ความเคลื่อนไหวที่กระทบการแข่งขัน (ขึ้นราคา, Fuel Surcharge, เปลี่ยน Policy)
+              <span className="alert-badge">⚠ Risk</span> = Gemini ตรวจพบการเปลี่ยนแปลงที่กระทบ TP Logistics เช่น คู่แข่งขึ้นราคา, Fuel Surcharge, เปลี่ยน Policy
             </span>
             <span className="legend-item">
-              <span className="sentiment-badge sentiment--positive">+5</span> ข่าวดี
-              <span className="sentiment-badge sentiment--neutral">0</span> Neutral
-              <span className="sentiment-badge sentiment--negative">-5</span> ข่าวลบ
+              Sentiment (ต่อแบรนด์นั้นๆ):
+              <span className="sentiment-badge sentiment--positive">+5</span> ข่าวดีต่อแบรนด์
+              <span className="sentiment-badge sentiment--neutral">0</span> เป็นกลาง/ไม่มีข้อมูล
+              <span className="sentiment-badge sentiment--negative">-5</span> ข่าวลบต่อแบรนด์
             </span>
           </div>
 
