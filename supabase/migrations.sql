@@ -2,13 +2,14 @@
 -- V2: Daily Snapshot + Sentiment Architecture
 -- ============================================================
 
--- daily_snapshots: one row per brand per day
+-- daily_snapshots: one row per brand per run
 -- contains raw news from Perplexity + Gemini analysis
 create table if not exists daily_snapshots (
   id              uuid primary key default gen_random_uuid(),
   company_id      text not null,
   company_name    text not null,
   snapshot_date   text not null,                -- 'YYYY-MM-DD' Bangkok time
+  snapshot_time   text not null default '09:00', -- 'HH:MM' Bangkok time
   raw_news        text not null,                -- raw Perplexity response
   sentiment_score numeric(3,1),                 -- -10.0 to 10.0
   sentiment_label text,                         -- 'positive' | 'neutral' | 'negative'
@@ -18,13 +19,13 @@ create table if not exists daily_snapshots (
   risk_flag       boolean not null default false,
   trigger_source  text not null default 'manual',   -- 'scheduled' | 'manual'
   created_at      timestamptz not null default now(),
-  unique(company_id, snapshot_date)
+  unique(company_id, snapshot_date, snapshot_time)
 );
 
-create index if not exists idx_daily_company_date
-  on daily_snapshots (company_id, snapshot_date desc);
-create index if not exists idx_daily_date
-  on daily_snapshots (snapshot_date desc);
+create index if not exists idx_daily_company_date_time
+  on daily_snapshots (company_id, snapshot_date desc, snapshot_time desc);
+create index if not exists idx_daily_date_time
+  on daily_snapshots (snapshot_date desc, snapshot_time desc);
 
 -- generated_reports: on-demand reports for date ranges
 create table if not exists generated_reports (
