@@ -7,6 +7,19 @@ import ReportView from "./components/ReportView";
 type Tab = "daily" | "report";
 type Status = "idle" | "loading" | "error";
 
+const COMPANY_ORDER = [
+  "thailand_post", "nim_express", "best_express",
+  "kex_express", "flash_express", "jnt_express", "tp_logistics",
+];
+
+function sortByCompanyOrder(items: DailySnapshot[]): DailySnapshot[] {
+  return [...items].sort((a, b) => {
+    const ia = COMPANY_ORDER.indexOf(a.company_id);
+    const ib = COMPANY_ORDER.indexOf(b.company_id);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("daily");
   const [data, setData] = useState<DailySnapshot[]>([]);
@@ -127,7 +140,7 @@ export default function App() {
             {status === "idle" && data.length === 0 && (
               <div className="empty-state">ยังไม่มีข้อมูลสำหรับวันนี้ — กด "รันตอนนี้" เพื่อเริ่มต้น</div>
             )}
-            {status === "idle" && data.map((snapshot) => (
+            {status === "idle" && sortByCompanyOrder(data).map((snapshot) => (
               <CompanyCard key={snapshot.id} data={snapshot} />
             ))}
           </main>
