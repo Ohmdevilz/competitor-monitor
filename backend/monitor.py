@@ -23,13 +23,41 @@ PERPLEXITY_API_BASE = "https://api.perplexity.ai/chat/completions"
 PERPLEXITY_MODEL = "sonar-pro"
 
 COMPANIES = [
-    {"id": "thailand_post",  "name": "ไปรษณีย์ไทย",  "name_en": "Thailand Post"},
-    {"id": "flash_express",  "name": "Flash Express",  "name_en": "Flash Express Thailand"},
-    {"id": "kex_express",    "name": "KEX Express",    "name_en": "KEX Express Kerry Express Thailand"},
-    {"id": "jnt_express",    "name": "J&T Express",    "name_en": "J&T Express Thailand"},
-    {"id": "best_express",   "name": "Best Express",   "name_en": "Best Express Thailand"},
-    {"id": "nim_express",    "name": "Nim Express",    "name_en": "Nim Express Thailand"},
-    {"id": "tp_logistics",   "name": "TP Logistics",   "name_en": "TP Logistics Thailand"},
+    {
+        "id": "thailand_post", "name": "ไปรษณีย์ไทย", "name_en": "Thailand Post",
+        "website": "https://www.thailandpost.co.th/",
+        "facebook": "https://www.facebook.com/thailandpost.co.th/",
+    },
+    {
+        "id": "flash_express", "name": "Flash Express", "name_en": "Flash Express Thailand",
+        "website": "https://www.flashexpress.co.th/",
+        "facebook": "https://www.facebook.com/FlashExpressThailand/",
+    },
+    {
+        "id": "kex_express", "name": "KEX Express", "name_en": "KEX Express Kerry Express Thailand",
+        "website": "https://th.kex-express.com/",
+        "facebook": "https://www.facebook.com/kexthailand/",
+    },
+    {
+        "id": "jnt_express", "name": "J&T Express", "name_en": "J&T Express Thailand",
+        "website": "https://jtexpress.co.th/",
+        "facebook": "https://www.facebook.com/jntexpressthailandHQ/",
+    },
+    {
+        "id": "best_express", "name": "Best Express", "name_en": "Best Express Thailand",
+        "website": "https://www.best-inc.co.th/",
+        "facebook": "https://www.facebook.com/BESTExpressThailand/",
+    },
+    {
+        "id": "nim_express", "name": "Nim Express", "name_en": "Nim Express Thailand",
+        "website": "https://www.nimexpress.com/",
+        "facebook": "https://www.facebook.com/nimexp/",
+    },
+    {
+        "id": "tp_logistics", "name": "TP Logistics", "name_en": "TP Logistics Thailand",
+        "website": "https://thaiparcels.com/",
+        "facebook": None,
+    },
 ]
 
 
@@ -46,11 +74,30 @@ def _perplexity_search(company: dict, api_key: str) -> str:
         "If no recent news is found, say so clearly. Do not hallucinate."
     )
 
+    # Build brand-specific source list
+    sources = [f"- เว็บไซต์หลัก: {company['website']}"]
+    if company.get("facebook"):
+        sources.append(f"- Facebook: {company['facebook']}")
+    sources_text = "\n".join(sources)
+
     prompt = f"""วันที่และเวลาปัจจุบัน: {now_bkk} (เวลาไทย)
 
-ค้นหาข่าวและข้อมูลใหม่เกี่ยวกับ {company['name']} ({company['name_en']}) ในช่วง 24 ชั่วโมงที่ผ่านมา
+ค้นหาข่าวและข้อมูลใหม่เกี่ยวกับ {company['name']} ({company['name_en']}) ในช่วง 24 ชั่วโมงที่ผ่านมาเท่านั้น
 
-หัวข้อที่ต้องค้นหา:
+## แหล่งข้อมูลที่ต้องตรวจสอบ (เรียงตามลำดับความสำคัญ)
+
+### 1. แหล่งหลักของแบรนด์ — ตรวจสอบก่อน
+{sources_text}
+
+### 2. เว็บข่าวธุรกิจและโลจิสติกส์ไทย
+- ข่าวจาก Prachachat, Thansettakij, Marketeer, Logistics Manager, Bangkokbiznews, Posttoday
+- ข่าวจาก Google News ที่เกี่ยวข้องกับ {company['name']}
+
+### 3. Pantip
+- กระทู้ใน Pantip ที่พูดถึง {company['name']} ในช่วง 24 ชั่วโมงที่ผ่านมา
+- เช่น รีวิว ร้องเรียน ประสบการณ์ใช้บริการ
+
+## หัวข้อที่ต้องค้นหา
 1. การปรับราคาค่าขนส่ง หรือค่าบริการใหม่
 2. ค่าธรรมเนียมเพิ่มเติม (Fuel Surcharge, Remote Area Surcharge)
 3. การงดรับพัสดุ หรือจำกัดพื้นที่บริการ
@@ -58,6 +105,7 @@ def _perplexity_search(company: dict, api_key: str) -> str:
 5. ข่าวสำคัญ (นโยบายใหม่, ปัญหาบริการ, การขยายธุรกิจ, ความร่วมมือ)
 6. ข่าวเชิงลบ (ร้องเรียน, ปัญหาคุณภาพ, ข้อพิพาท)
 
+## รูปแบบการตอบ
 ตอบเป็นภาษาไทย พร้อมระบุแหล่งที่มาและวันที่ของข่าวแต่ละชิ้น
 ถ้าไม่พบข่าวใหม่ใน 24 ชั่วโมง ให้ระบุว่า "ไม่พบข่าวใหม่ในช่วง 24 ชั่วโมงที่ผ่านมา"
 """
