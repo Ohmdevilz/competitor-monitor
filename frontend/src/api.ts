@@ -7,6 +7,7 @@ export interface DailySnapshot {
   company_id: string;
   company_name: string;
   snapshot_date: string;
+  snapshot_time: string;
   raw_news: string;
   sentiment_score: number | null;
   sentiment_label: string | null;
@@ -14,7 +15,14 @@ export interface DailySnapshot {
   top_themes: string[];
   action_items: string | null;
   risk_flag: boolean;
+  trigger_source: string;
   created_at: string;
+}
+
+export interface RunInfo {
+  date: string;
+  time: string;
+  trigger_source: string;  // "scheduled" | "manual"
 }
 
 export interface ReportResult {
@@ -34,28 +42,27 @@ export interface SavedReport {
 
 // ─── Daily Snapshots ────────────────────────────────────────────────────────
 
-export async function fetchDaily(date: string): Promise<DailySnapshot[]> {
-  const res = await fetch(`${BASE}/daily?date=${date}`);
+export async function fetchDaily(date: string, time: string): Promise<DailySnapshot[]> {
+  const res = await fetch(`${BASE}/daily?date=${date}&time=${encodeURIComponent(time)}`);
   if (!res.ok) throw new Error("Failed to fetch daily snapshots");
   return res.json();
 }
 
-export interface DateInfo {
-  date: string;
-  trigger_source: string;  // "scheduled" | "manual"
-}
-
-export async function fetchDates(): Promise<DateInfo[]> {
-  const res = await fetch(`${BASE}/dates`);
+export async function fetchRuns(): Promise<RunInfo[]> {
+  const res = await fetch(`${BASE}/runs`);
   if (!res.ok) return [];
   return res.json();
 }
 
 // ─── On-Demand Report ───────────────────────────────────────────────────────
 
-export async function generateReport(dateFrom: string, dateTo: string): Promise<ReportResult> {
+export async function generateReport(
+  dateFrom: string,
+  dateTo: string,
+  triggerSource: string = "all",
+): Promise<ReportResult> {
   const res = await fetch(
-    `${BASE}/report?date_from=${dateFrom}&date_to=${dateTo}`,
+    `${BASE}/report?date_from=${dateFrom}&date_to=${dateTo}&trigger_source=${triggerSource}`,
     { method: "POST" },
   );
   if (!res.ok) throw new Error("Failed to generate report");

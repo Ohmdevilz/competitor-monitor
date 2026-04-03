@@ -6,6 +6,7 @@ import type { ReportResult, SavedReport } from "../api";
 export default function ReportView() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [report, setReport] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +33,7 @@ export default function ReportView() {
     setReport(null);
     setViewingHistory(null);
     try {
-      const result = await generateReport(dateFrom, dateTo);
+      const result = await generateReport(dateFrom, dateTo, sourceFilter);
       setReport(result);
       await loadHistory();
     } catch {
@@ -70,6 +71,14 @@ export default function ReportView() {
         <label className="date-label">
           ถึง
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="date-input" />
+        </label>
+        <label className="date-label">
+          ข้อมูลจาก
+          <select className="filter-select" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+            <option value="all">All</option>
+            <option value="scheduled">Scheduled เท่านั้น</option>
+            <option value="manual">Manual เท่านั้น</option>
+          </select>
         </label>
         <button className="btn-generate" onClick={handleGenerate} disabled={loading || !dateFrom || !dateTo}>
           {loading ? "กำลังสร้างรายงาน..." : "สร้างรายงาน"}

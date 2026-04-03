@@ -157,6 +157,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   border-radius: 6px;
   padding: 4px 10px;
 }
+.label--scheduled { border-color: var(--positive); color: var(--positive); }
+.label--manual { border-color: var(--accent); color: var(--accent); }
 
 /* ─── Legend ────────────────────────────────────────────────────────────────── */
 .legend {

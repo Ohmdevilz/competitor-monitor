@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import type { DailySnapshot, DateInfo } from "./api";
-import { fetchDaily, fetchDates, triggerRun } from "./api";
+import type { DailySnapshot, RunInfo } from "./api";
+import { fetchDaily, fetchRuns, triggerRun } from "./api";
 import CompanyCard from "./components/CompanyCard";
 import ReportView from "./components/ReportView";
 
@@ -20,12 +20,16 @@ function sortByCompanyOrder(items: DailySnapshot[]): DailySnapshot[] {
   });
 }
 
+function runKey(r: RunInfo): string {
+  return `${r.date}_${r.time}`;
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("daily");
   const [data, setData] = useState<DailySnapshot[]>([]);
   const [status, setStatus] = useState<Status>("loading");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [availableDates, setAvailableDates] = useState<DateInfo[]>([]);
+  const [selectedRun, setSelectedRun] = useState("");     // "date_time"
+  const [availableRuns, setAvailableRuns] = useState<RunInfo[]>([]);
   const [runStatus, setRunStatus] = useState("");
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const stored = localStorage.getItem("darkMode");
@@ -37,22 +41,23 @@ export default function App() {
     localStorage.setItem("darkMode", String(darkMode));
   }, [darkMode]);
 
-  // Load available dates on mount
+  // Load available runs on mount
   useEffect(() => {
-    fetchDates().then((dates) => {
-      setAvailableDates(dates);
-      if (dates.length > 0 && !selectedDate) {
-        setSelectedDate(dates[0].date);
+    fetchRuns().then((runs) => {
+      setAvailableRuns(runs);
+      if (runs.length > 0 && !selectedRun) {
+        setSelectedRun(runKey(runs[0]));
       }
     }).catch(console.error);
   }, []);
 
-  // Load daily snapshots when date changes
-  const loadDaily = useCallback(async (date: string) => {
-    if (!date) return;
+  // Load snapshots when selected run changes
+  const loadDaily = useCallback(async (key: string) => {
+    if (!key) return;
+    const [date, time] = key.split("_");
     setStatus("loading");
     try {
-      const result = await fetchDaily(date);
+      const result = await fetchDaily(date, time);
       setData(result);
       setStatus("idle");
     } catch {
@@ -61,19 +66,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (selectedDate) loadDaily(selectedDate);
-  }, [selectedDate, loadDaily]);
+    if (selectedRun) loadDaily(selectedRun);
+  }, [selectedRun, loadDaily]);
 
   async function handleRunNow() {
     setRunStatus("กำลังรัน...");
     try {
       await triggerRun();
       setRunStatus("รันเสร็จแล้ว! กำลังโหลดข้อมูลใหม่...");
-      const dates = await fetchDates();
-      setAvailableDates(dates);
-      if (dates.length > 0) {
-        setSelectedDate(dates[0].date);
-        await loadDaily(dates[0].date);
+      const runs = await fetchRuns();
+      setAvailableRuns(runs);
+      if (runs.length > 0) {
+        const key = runKey(runs[0]);
+        setSelectedRun(key);
+        await loadDaily(key);
       }
       setRunStatus("");
     } catch {
@@ -81,6 +87,8 @@ export default function App() {
       setTimeout(() => setRunStatus(""), 3000);
     }
   }
+
+  const currentRun = availableRuns.find((r) => runKey(r) === selectedRun);
 
   return (
     <div className="app">
@@ -115,19 +123,19 @@ export default function App() {
           <div className="filter-section">
             <select
               className="filter-select"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              value={selectedRun}
+              onChange={(e) => setSelectedRun(e.target.value)}
             >
-              <option value="">— เลือกวันที่ —</option>
-              {availableDates.map((d) => (
-                <option key={d.date} value={d.date}>
-                  {d.date} [{d.trigger_source === "scheduled" ? "Scheduled" : "Manual"}]
+              <option value="">— เลือก Run —</option>
+              {availableRuns.map((r) => (
+                <option key={runKey(r)} value={runKey(r)}>
+                  {r.date} {r.time} [{r.trigger_source === "scheduled" ? "Scheduled" : "Manual"}]
                 </option>
               ))}
             </select>
-            {selectedDate && (
-              <span className="viewing-label">
-                แสดงข้อมูลวันที่ {selectedDate}
+            {currentRun && (
+              <span className={`viewing-label ${currentRun.trigger_source === "scheduled" ? "label--scheduled" : "label--manual"}`}>
+                {currentRun.date} {currentRun.time} — {currentRun.trigger_source === "scheduled" ? "Scheduled" : "Manual"}
               </span>
             )}
           </div>
@@ -152,7 +160,7 @@ export default function App() {
               <div className="error-state">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>
             )}
             {status === "idle" && data.length === 0 && (
-              <div className="empty-state">ยังไม่มีข้อมูลสำหรับวันนี้ — กด "รันตอนนี้" เพื่อเริ่มต้น</div>
+              <div className="empty-state">ยังไม่มีข้อมูลสำหรับ run นี้ — กด "รันตอนนี้" เพื่อเริ่มต้น</div>
             )}
             {status === "idle" && sortByCompanyOrder(data).map((snapshot) => (
               <CompanyCard key={snapshot.id} data={snapshot} />
