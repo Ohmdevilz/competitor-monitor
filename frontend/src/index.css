@@ -158,6 +158,23 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   padding: 4px 10px;
 }
 
+/* ─── Legend ────────────────────────────────────────────────────────────────── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 18px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ─── Card Grid ────────────────────────────────────────────────────────────── */
 .card-grid {
   display: grid;

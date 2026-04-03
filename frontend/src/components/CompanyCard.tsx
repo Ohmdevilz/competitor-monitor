@@ -32,8 +32,16 @@ export default function CompanyCard({ data }: Props) {
       <div className="card-header">
         <span className="company-name">{data.company_name}</span>
         <div className="card-badges">
-          {data.risk_flag && <span className="alert-badge">⚠ Risk</span>}
-          <span className={`sentiment-badge ${sentimentColor(data.sentiment_label)}`}>
+          {data.risk_flag && (
+            <span
+              className="alert-badge"
+              title="Gemini ตรวจพบความเคลื่อนไหวที่กระทบการแข่งขัน เช่น ขึ้นราคา, Fuel Surcharge, เปลี่ยน Policy"
+            >⚠ Risk</span>
+          )}
+          <span
+            className={`sentiment-badge ${sentimentColor(data.sentiment_label)}`}
+            title="Sentiment Score: +5 = ข่าวดี/ตรึงราคา, 0 = Neutral/ไม่มีข้อมูล, -5 = ข่าวลบ/ขึ้นราคา"
+          >
             {formatScore(data.sentiment_score)}
           </span>
         </div>

@@ -132,6 +132,17 @@ export default function App() {
             )}
           </div>
 
+          <div className="legend">
+            <span className="legend-item">
+              <span className="alert-badge">⚠ Risk</span> = ความเคลื่อนไหวที่กระทบการแข่งขัน (ขึ้นราคา, Fuel Surcharge, เปลี่ยน Policy)
+            </span>
+            <span className="legend-item">
+              <span className="sentiment-badge sentiment--positive">+5</span> ข่าวดี
+              <span className="sentiment-badge sentiment--neutral">0</span> Neutral
+              <span className="sentiment-badge sentiment--negative">-5</span> ข่าวลบ
+            </span>
+          </div>
+
           <main className="card-grid">
             {status === "loading" && (
               <div className="loading-state">กำลังโหลดข้อมูล...</div>
