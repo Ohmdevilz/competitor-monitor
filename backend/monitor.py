@@ -95,7 +95,7 @@ def _gemini_analyze_brand(company: dict, raw_news: str, gemini_client) -> dict:
   "sentiment_label": "<positive|neutral|negative>",
   "summary": "<สรุปข่าวสำคัญเป็นภาษาไทย 2-3 ประโยค>",
   "top_themes": [<รายการหัวข้อสำคัญ เช่น "pricing", "expansion", "service_issue", "promotion", "partnership">],
-  "action_items": "<สิ่งที่ TP Logistics ควรทำตอบสนอง ถ้ามี หรือ null>",
+  "action_items": "<สิ่งที่ TP Logistics ควรทำตอบสนองต่อข่าวนี้ — ต้องตอบเสมอ ห้ามเป็น null เช่น ติดตามราคา, เตรียมแผนรับมือ, ไม่ต้องดำเนินการเร่งด่วน เป็นต้น>",
   "risk_flag": <true ถ้ามีการเปลี่ยนแปลงสำคัญที่กระทบ TP Logistics, false ถ้าไม่มี>
 }}
 """
