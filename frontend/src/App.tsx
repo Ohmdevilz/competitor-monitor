@@ -163,7 +163,9 @@ export default function App() {
             {status === "idle" && data.length === 0 && (
               <div className="empty-state">ยังไม่มีข้อมูลสำหรับ run นี้ — กด "รันตอนนี้" เพื่อเริ่มต้น</div>
             )}
-            {status === "idle" && sortByCompanyOrder(data).map((snapshot) => (
+            {status === "idle" && sortByCompanyOrder(data)
+              .filter((s) => s.company_id !== "tp_logistics")
+              .map((snapshot) => (
               <CompanyCard key={snapshot.id} data={snapshot} />
             ))}
           </main>
