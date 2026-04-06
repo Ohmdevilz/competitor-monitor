@@ -28,6 +28,7 @@ export default function ReportView() {
 
   async function handleGenerate() {
     if (!dateFrom || !dateTo) return;
+    if (!window.confirm(`ยืนยันสร้างรายงาน?\nช่วง ${dateFrom} ถึง ${dateTo}\nอาจใช้เวลาสักครู่`)) return;
     setLoading(true);
     setError("");
     setReport(null);

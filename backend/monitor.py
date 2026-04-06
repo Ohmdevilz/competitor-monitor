@@ -258,66 +258,102 @@ def generate_report(date_from: str, date_to: str, gemini_api_key: str, trigger_s
     if not snapshots:
         return f"# ไม่พบข้อมูล\n\nไม่พบ snapshot ในช่วง {date_from} ถึง {date_to}"
 
-    # Group by company
-    by_company: dict[str, list[dict]] = {}
+    # Group by company, separate competitors from TP
+    competitors_data: dict[str, list[dict]] = {}
+    tp_data: list[dict] = []
     for s in snapshots:
-        by_company.setdefault(s["company_id"], []).append(s)
+        if s["company_id"] == "tp_logistics":
+            tp_data.append(s)
+        else:
+            competitors_data.setdefault(s["company_id"], []).append(s)
 
-    # Build context for Gemini
-    context_parts = []
-    for cid, items in by_company.items():
+    # Sort competitors by COMPANY_ORDER
+    company_order = [c["id"] for c in COMPANIES if c["id"] != "tp_logistics"]
+    sorted_cids = sorted(competitors_data.keys(), key=lambda cid: company_order.index(cid) if cid in company_order else 999)
+
+    # Build competitor context
+    competitor_parts = []
+    for cid in sorted_cids:
+        items = competitors_data[cid]
         name = items[0]["company_name"]
-        context_parts.append(f"\n### {name}")
+        competitor_parts.append(f"\n### {name}")
         for item in items:
             date = item["snapshot_date"]
             score = item.get("sentiment_score", "N/A")
             label = item.get("sentiment_label", "N/A")
             summary = item.get("summary") or item.get("raw_news", "")[:300]
             themes = item.get("top_themes", [])
-            action = item.get("action_items") or "-"
             risk = "⚠️ YES" if item.get("risk_flag") else "No"
-            context_parts.append(
+            competitor_parts.append(
                 f"- **{date}** | Sentiment: {score} ({label}) | Risk: {risk}\n"
                 f"  สรุป: {summary}\n"
-                f"  Themes: {', '.join(themes) if themes else '-'}\n"
-                f"  Action: {action}"
+                f"  Themes: {', '.join(themes) if isinstance(themes, list) else themes or '-'}"
             )
 
-    context = "\n".join(context_parts)
+    # Build TP context
+    tp_parts = []
+    for item in tp_data:
+        date = item["snapshot_date"]
+        score = item.get("sentiment_score", "N/A")
+        label = item.get("sentiment_label", "N/A")
+        summary = item.get("summary") or item.get("raw_news", "")[:300]
+        themes = item.get("top_themes", [])
+        action = item.get("action_items") or "-"
+        risk = "⚠️ YES" if item.get("risk_flag") else "No"
+        tp_parts.append(
+            f"- **{date}** | Sentiment: {score} ({label}) | Risk: {risk}\n"
+            f"  สรุป: {summary}\n"
+            f"  Themes: {', '.join(themes) if isinstance(themes, list) else themes or '-'}\n"
+            f"  Action: {action}"
+        )
+
+    competitor_context = "\n".join(competitor_parts)
+    tp_context = "\n".join(tp_parts) if tp_parts else "ไม่มีข้อมูล"
 
     client = genai.Client(api_key=gemini_api_key)
 
     prompt = f"""คุณเป็นที่ปรึกษาด้านกลยุทธ์ตลาดขนส่งไทยระดับ Senior ให้กับ TP Logistics
 สร้างรายงานวิเคราะห์คู่แข่งจากข้อมูลช่วง {date_from} ถึง {date_to}
 
---- ข้อมูล Daily Snapshots ---
-{context}
---- จบข้อมูล ---
+--- ข้อมูลคู่แข่ง 6 ราย ---
+{competitor_context}
+--- จบข้อมูลคู่แข่ง ---
 
-เขียนรายงานเป็น Markdown ภาษาไทย ตามโครงสร้างนี้:
+--- ข้อมูล TP Logistics (แบรนด์ของเรา) ---
+{tp_context}
+--- จบข้อมูล TP Logistics ---
 
-# 📊 รายงานวิเคราะห์คู่แข่ง
+เขียนรายงานเป็น Markdown ภาษาไทย ตามโครงสร้างนี้อย่างเคร่งครัด:
+
+# รายงานวิเคราะห์คู่แข่ง
 **ช่วงเวลา:** {date_from} ถึง {date_to}
 
 ## Executive Summary
 สรุปภาพรวมตลาดขนส่งในช่วงนี้ 3-5 ประโยค
 
 ## วิเคราะห์รายแบรนด์
+(เรียงลำดับตามนี้: ไปรษณีย์ไทย, Nim Express, Best Express, KEX Express, Flash Express, J&T Express)
+(ไม่ต้องรวม TP Logistics ในส่วนนี้)
 
-(สำหรับแต่ละแบรนด์ที่มีข้อมูล:)
+สำหรับแต่ละแบรนด์คู่แข่ง ให้แสดงเฉพาะ:
 ### [ชื่อแบรนด์]
 - **Sentiment Score:** [คะแนน] ([label])
 - **Top Themes:** [หัวข้อสำคัญ]
 - **สรุป:** [วิเคราะห์สถานการณ์]
-- **Action:** [สิ่งที่ TP Logistics ควรตอบสนอง]
+
+(ห้ามใส่ Action ในส่วนนี้)
 
 ## Cross-brand Insights
-วิเคราะห์เปรียบเทียบข้ามแบรนด์ แนวโน้มร่วม ความแตกต่าง
+วิเคราะห์เปรียบเทียบข้ามแบรนด์คู่แข่ง แนวโน้มร่วม ความแตกต่าง
 
 ## Strategic Implications สำหรับ TP Logistics
-คำแนะนำเชิงกลยุทธ์สำหรับ TP Logistics โดยเฉพาะ
+ส่วนนี้ให้สรุปข้อมูลของ TP Logistics รวมกับคำแนะนำเชิงกลยุทธ์:
+- **Sentiment Score ของ TP:** [คะแนน] ([label])
+- **Top Themes ของ TP:** [หัวข้อสำคัญ]
+- **สรุปสถานการณ์ TP:** [สรุปข่าวของ TP Logistics]
+- **Action:** [คำแนะนำเชิงกลยุทธ์สำหรับ TP Logistics โดยอิงจากสถานการณ์คู่แข่งทั้ง 6 ราย + ข่าวของ TP เอง]
 
-## ⚠️ Risk Flags
+## Risk Flags
 รายการความเสี่ยงที่ต้องจับตา (ถ้ามี) หรือระบุว่าไม่พบความเสี่ยงสำคัญ
 """
 
