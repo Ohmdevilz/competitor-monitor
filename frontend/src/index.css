@@ -405,7 +405,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
 }
 .history-item:hover { border-color: var(--accent); }
 
-.history-item-dates { font-size: 0.9rem; font-weight: 600; }
+.history-item-dates { font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.history-source-tag { font-size: 0.7rem; font-weight: 500; color: var(--accent); }
 .history-item-meta { font-size: 0.75rem; color: var(--text-dim); }
 
 .history-viewing-bar {

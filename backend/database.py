@@ -130,6 +130,7 @@ def save_report(date_from: str, date_to: str, report_md: str, trigger_filter: st
         "date_from": date_from,
         "date_to": date_to,
         "report_md": report_md,
+        "trigger_filter": trigger_filter,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     resp = get_client().table("generated_reports").insert(row).execute()

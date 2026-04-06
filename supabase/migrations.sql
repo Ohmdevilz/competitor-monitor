@@ -32,8 +32,9 @@ create table if not exists generated_reports (
   id          uuid primary key default gen_random_uuid(),
   date_from   text not null,
   date_to     text not null,
-  report_md   text not null,                    -- full markdown report
-  created_at  timestamptz not null default now()
+  report_md       text not null,                    -- full markdown report
+  trigger_filter  text not null default 'all',     -- 'all' | 'scheduled' | 'manual'
+  created_at      timestamptz not null default now()
 );
 
 create index if not exists idx_reports_dates

@@ -68,7 +68,7 @@ def create_report(
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY / GOOGLE_API_KEY not configured")
 
     report_md = generate_report(date_from, date_to, gemini_key, trigger_source)
-    saved = db.save_report(date_from, date_to, report_md)
+    saved = db.save_report(date_from, date_to, report_md, trigger_filter=trigger_source)
     return {"report_md": report_md, "date_from": date_from, "date_to": date_to, "id": saved.get("id")}
 
 

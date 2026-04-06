@@ -3,6 +3,12 @@ import Markdown from "react-markdown";
 import { generateReport, fetchReports } from "../api";
 import type { ReportResult, SavedReport } from "../api";
 
+function sourceLabel(filter?: string): string {
+  if (filter === "scheduled") return "Scheduled";
+  if (filter === "manual") return "Manual";
+  return "All";
+}
+
 export default function ReportView() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -28,7 +34,8 @@ export default function ReportView() {
 
   async function handleGenerate() {
     if (!dateFrom || !dateTo) return;
-    if (!window.confirm(`ยืนยันสร้างรายงาน?\nช่วง ${dateFrom} ถึง ${dateTo}\nอาจใช้เวลาสักครู่`)) return;
+    const sourceLabel = sourceFilter === "all" ? "All" : sourceFilter === "scheduled" ? "Scheduled" : "Manual";
+    if (!window.confirm(`ยืนยันสร้างรายงาน?\nช่วง ${dateFrom} ถึง ${dateTo}\nข้อมูลจาก: ${sourceLabel}\nอาจใช้เวลาสักครู่`)) return;
     setLoading(true);
     setError("");
     setReport(null);
@@ -124,6 +131,7 @@ export default function ReportView() {
             <button key={item.id} className="history-item" onClick={() => handleViewHistory(item)}>
               <div className="history-item-dates">
                 {item.date_from} ถึง {item.date_to}
+                <span className="history-source-tag">[{sourceLabel(item.trigger_filter)}]</span>
               </div>
               <div className="history-item-meta">
                 สร้างเมื่อ {new Date(item.created_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}

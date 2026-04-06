@@ -37,6 +37,7 @@ export interface SavedReport {
   date_from: string;
   date_to: string;
   report_md: string;
+  trigger_filter?: string;
   created_at: string;
 }
 
